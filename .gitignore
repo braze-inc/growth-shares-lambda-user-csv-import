@@ -1,0 +1,15 @@
+# Virtual Env
+.venv
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+.vscode
+
+# SAM
+.aws-sam
+
+packaged.yaml
+samconfig.toml

@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Function responsible for reading and processing a CSV file with user attributes from an S3 bucket and posting them to Braze API
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: braze-user-csv-import
+    Description: Processes User Attribute CSV files
+    Author: Maciej Olko
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE.txt
+    ReadmeUrl: README.md
+    Labels: ["braze", "user-attributes"]
+    HomePageUrl: https://github.com/braze-inc/growth-shares-lambda-user-csv-import
+    SemanticVersion: 0.1.0
+    SourceCodeUrl: hhttps://github.com/braze-inc/growth-shares-lambda-user-csv-import
+
+Parameters:
+  BrazeAPIKey:
+    Type: String
+  BrazeAPIURL:
+    Type: String
+
+Globals:
+  Function:
+    Timeout: 900
+
+Resources:
+  TestBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Join
+        - "-"
+        - - "braze-user-csv-ingest"
+          - !Select
+            - 0
+            - !Split
+              - "-"
+              - !Select
+                - 2
+                - !Split
+                  - "/"
+                  - !Ref "AWS::StackId"
+
+  BrazeCSVUserImport:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: braze-user-csv-import
+      CodeUri: braze_user_csv_import/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      MemorySize: 256
+      Environment:
+        Variables:
+          BRAZE_API_KEY: !Ref BrazeAPIKey
+          BRAZE_API_URL: !Ref BrazeAPIURL
+
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref TestBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: suffix
+                    Value: .csv
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Join
+              - "-"
+              - - "braze-user-csv-ingest"
+                - !Select
+                  - 0
+                  - !Split
+                    - "-"
+                    - !Select
+                      - 2
+                      - !Split
+                        - "/"
+                        - !Ref "AWS::StackId"
