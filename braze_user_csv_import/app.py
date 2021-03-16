@@ -280,6 +280,7 @@ def _handle_braze_response(response: requests.Response, users: List[Dict]) -> in
 
         if server_error:
             _wait()
+            _post_to_braze(users)
 
         return 0
 
