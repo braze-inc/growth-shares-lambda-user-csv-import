@@ -37,7 +37,6 @@ FUNCTION_RUN_TIME = 12 * 60 * 1_000
 FUNCTION_TIME_OUT = 900_000 - FUNCTION_RUN_TIME
 MAX_THREADS = 20
 
-# In case of an API error
 MAX_API_RETRIES = 6
 RETRIES = 0
 
@@ -48,7 +47,6 @@ if BRAZE_API_URL[-1] == '/':
     BRAZE_API_URL = BRAZE_API_URL[:-1]
 
 # re_array_column = re.compile(r"^\[(.+)\]$")
-lock = Lock()
 
 
 def lambda_handler(event, context):
@@ -64,23 +62,28 @@ def lambda_handler(event, context):
     object_key = event['Records'][0]['s3']['object']['key']
 
     print(f"Processing {bucket_name}/{object_key}")
-    reader = CsvProcessor(
-        bucket_name,
-        object_key,
-        event.get("offset", 0),
-        event.get("headers", None),
-    )
-    reader.process_file(context)
+    csv_processor = CsvProcessor(bucket_name, object_key,
+                                 event.get("offset", 0),
+                                 event.get("headers", None))
 
-    print(f"Processed {reader.processed_users:,} users.")
-    if not reader.is_finished():
+    try:
+        csv_processor.process_file(context)
+    except FatalAPIError as e:
+        _handle_fatal_api_error(e, csv_processor.processed_users)
+        raise
+    except Exception as e:
+        _handle_unexpected_error(e, csv_processor.processed_users)
+        raise
+
+    print(f"Processed {csv_processor.processed_users:,} users.")
+    if not csv_processor.is_finished():
         _start_next_process(context.function_name, event,
-                            reader.offset, reader.headers)
+                            csv_processor.offset, csv_processor.headers)
 
     return {
-        "users_processed": reader.processed_users,
-        "bytes_read": reader.offset - event.get("offset", 0),
-        "is_finished": reader.is_finished()
+        "users_processed": csv_processor.processed_users,
+        "bytes_read": csv_processor.offset - event.get("offset", 0),
+        "is_finished": csv_processor.is_finished()
     }
 
 
@@ -159,21 +162,13 @@ class CsvProcessor:
             self.offset += len(leftover)
 
     def post_users(self, user_chunks: List[List]) -> None:
-        """Posts users from up to `MAX_THREADS` simultaneously.
-        Max threads is set at 20, by default.
+        """Posts updated users to Braze platform using Braze API.
 
-        :param user_chunks: List of dictionaries where each key is the CSV
-                            header with the attribute namesand each values is
-                            the corresponding attribute value
+        :param user_chunks: List containing chunked user lists of maximum 75
+                            users
         """
-        with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-            try:
-                results = executor.map(_post_to_braze, user_chunks)
-                for result in results:
-                    self.processed_users += result
-            except RuntimeError:
-                print(f"Processed {self.processed_users} users")
-                sys.exit()
+        updated = _post_users(user_chunks)
+        self.processed_users += updated
 
     def is_finished(self) -> bool:
         """Returns whether the end of file was reached."""
@@ -224,67 +219,95 @@ def _process_row(user_row: Dict) -> None:
             user_row[col] = list_values
 
 
+def _post_users(user_chunks: List[List]) -> int:
+    """Posts users concurrently to Braze API, using `MAX_THREADS` concurrent
+    threads. 
+
+    In case of a server error, or in case of Too Many Requests (429) 
+    client error, the function will employ exponential delay stall and try 
+    again.
+
+    :return: Number of users successfully updated
+    """
+    updated = 0
+    with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
+        try:
+            results = executor.map(_post_to_braze, user_chunks)
+            for result in results:
+                updated += result
+        except APIRetryError:
+            _delay()
+            return _post_users(user_chunks)
+    return updated
+
+
 def _post_to_braze(users: List[Dict]) -> int:
     """Posts users read from the CSV file to Braze users/track API endpoint.
 
     Authentication is necessary. Braze Rest API key is expected to be passed
     to the lambda process as an environment variable, under `BRAZE_API_KEY` key.
+    In case of a lack of valid API Key, the function will fail.
 
-   :return: The number of users successfully imported
-   """
+    :return: The number of users successfully imported
+    """
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {BRAZE_API_KEY}",
     }
     data = json.dumps({"attributes": users})
-
     res = requests.post(
         f"{BRAZE_API_URL}/users/track", headers=headers, data=data
     )
 
-    updated = _handle_braze_response(res, users)
-    return updated
+    error_users = _handle_braze_response(res)
+    return len(users) - error_users
 
 
-def _handle_braze_response(response: requests.Response, users: List[Dict]) -> int:
-    """Handles response from Braze API. The amount of requests made is well 
+def _handle_braze_response(response: requests.Response) -> int:
+    """Handles server response from Braze API. 
+
+    The amount of requests made is well 
     below the limits for the given API endpoint therefore Too Many Requests
-    API errors are not expected.
+    API errors are not expected. In case they do, however, occur - the API
+    calls will be re-tried, up to `MAX_API_RETRIES`, using exponential delay.
+    In case of a server error, the same strategy will be applied. After max
+    retries have been reached, the execution will terminate.
 
     In case users were posted but there were minor mistakes, the errors will be
     logged. In case the API received data in an unexpected format, the data 
     that caused the issue will be logged.
-    In case of an server error, there will be `MAX_API_RETRIES` exponential
-    delay requests after which the script will end execution.
+
+    In any unexpected client API error (other than 300), the function execution 
+    will terminate.
 
     :param response: Response from the API
-    :param users: List of users to be updated sent to the API endpoint
-    :return: Actual number of users updated
-    :raise RuntimeError: After `MAX_API_RETRIES` unsuccessful attempts
+    :return: Number of users that resulted in an error
+    :raise APIRetryError: On a 429 or 500 server error
+    :raise FatalAPIError: After `MAX_API_RETRIES` unsuccessful retries, or on
+                          any non-400 client error
     """
     res_text = json.loads(response.text)
     if response.status_code == 201 and 'errors' in res_text:
         print(
             f"Encountered errors processing some users: {res_text['errors']}")
-        return len(users) - len(res_text['errors'])
+        return len(res_text['errors'])
 
-    if response.status_code != 201:
-        if response.status_code == 400:
-            print(f"Invalid API request format: {res_text}")
-
-        server_error = response.status_code == 429 or response.status_code >= 500
-        should_retry = server_error and RETRIES < MAX_API_RETRIES
-        if server_error and not should_retry:
-            print(f"Max retries reached.")
-            raise RuntimeError
-
-        if server_error:
-            _wait()
-            _post_to_braze(users)
-
+    if response.status_code == 400:
+        print(f"Encountered error for user chunk. {response.text}")
         return 0
 
-    return len(users)
+    server_error = response.status_code == 429 or response.status_code >= 500
+    should_retry = server_error and RETRIES < MAX_API_RETRIES
+    if server_error and not should_retry:
+        raise FatalAPIError("Too many requests")
+
+    if server_error:
+        raise APIRetryError
+
+    if response.status_code > 400:
+        raise FatalAPIError(response.text)
+
+    return 0
 
 
 def _start_next_process(function_name: str, event: Dict, offset: int,
@@ -311,10 +334,34 @@ def _should_terminate(context) -> bool:
     return context.get_remaining_time_in_millis() < FUNCTION_TIME_OUT
 
 
-def _wait():
-    lock.acquire()
+def _delay():
+    """Increase the number of retries and stall the execution."""
     global RETRIES
     RETRIES += 1
-    lock.release()
-
     sleep(2**RETRIES)
+
+
+def _handle_fatal_api_error(e: Exception, processed_users: int):
+    """Prints logging information -- error message and number of users
+    processed before the fatal API error."""
+    print(f"Posting data has failed due to an API error: {str(e)}")
+    print(f"Processed {processed_users:,} users.")
+
+
+def _handle_unexpected_error(e: Exception, processed_users: int):
+    """Prints logging information -- error message and number of users
+    processed before the unexpected error."""
+    print(f"Unexpected error: {str(e)}")
+    print(f"Processed {processed_users:,} users.")
+
+
+class APIRetryError(Exception):
+    """Raised on 429 or 5xx server exception. If there are retries left, the
+    API call will be made again after delay."""
+    pass
+
+
+class FatalAPIError(Exception):
+    """Raised when received an unexpected error from the server. Causes the
+    execution to fail."""
+    pass
