@@ -8,7 +8,7 @@ Metadata:
     Name: braze-user-csv-import
     Description: Processes User Attribute CSV files
     Author: Maciej Olko
-    SpdxLicenseId: MIT
+    SpdxLicenseId: MIT License
     LicenseUrl: LICENSE.txt
     ReadmeUrl: README.md
     Labels: ["braze", "user-attributes"]
