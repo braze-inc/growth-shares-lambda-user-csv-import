@@ -8,13 +8,13 @@ Metadata:
     Name: braze-user-csv-import
     Description: Processes User Attribute CSV files
     Author: Maciej Olko
-    SpdxLicenseId: MIT License
+    SpdxLicenseId: MIT
     LicenseUrl: LICENSE.txt
     ReadmeUrl: README.md
     Labels: ["braze", "user-attributes"]
     HomePageUrl: https://github.com/braze-inc/growth-shares-lambda-user-csv-import
     SemanticVersion: 0.1.0
-    SourceCodeUrl: hhttps://github.com/braze-inc/growth-shares-lambda-user-csv-import
+    SourceCodeUrl: https://github.com/braze-inc/growth-shares-lambda-user-csv-import
 
 Parameters:
   BrazeAPIKey:
