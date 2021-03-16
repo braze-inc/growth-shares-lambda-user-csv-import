@@ -38,7 +38,7 @@ FUNCTION_TIME_OUT = 900_000 - FUNCTION_RUN_TIME
 MAX_THREADS = 20
 
 # In case of an API error
-MAX_API_RETRIES = 5
+MAX_API_RETRIES = 6
 RETRIES = 0
 
 BRAZE_API_URL = os.environ['BRAZE_API_URL']
@@ -254,8 +254,8 @@ def _handle_braze_response(response: requests.Response, users: List[Dict]) -> in
     In case users were posted but there were minor mistakes, the errors will be
     logged. In case the API received data in an unexpected format, the data 
     that caused the issue will be logged.
-    In case of an server error, there will be 5 exponential requests after which
-    the script will end execution.
+    In case of an server error, there will be `MAX_API_RETRIES` exponential
+    delay requests after which the script will end execution.
 
     :param response: Response from the API
     :param users: List of users to be updated sent to the API endpoint
