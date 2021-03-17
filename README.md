@@ -10,7 +10,7 @@ User attributes to be updated are expected in the following `.csv` format:
     external_id,attr_1,...,attr_n
     userID,value_1,...,value_n
 
-where the first column must specify the external ID of the user to be updated and the following columns specify attribute names and values. The amount of attributes you specify can vary. If the `CSV` file to be processed does not follow this format, the function will fail.
+where the first column must specify the external ID of the user to be updated and the following columns specify attribute names and values. The amount of attributes you specify can vary. If the CSV file to be processed does not follow this format, the function will fail.
 
 ### CSV Processing
 
@@ -25,22 +25,22 @@ To successfully run this Lambda function, you will need:
 - **Braze API Key** to be able to send requests to `/users/track` endpoint
 - **CSV File** with user external IDs and attributes to update
 
-### Where to find your Braze API URL and key?
+### Where to find your Braze API URL and Braze API Key?
 
 #### REST Endpoint
 
 You can find your API URL, or the REST endpoint, in Braze documentation -- https://www.braze.com/docs/user_guide/administrative/access_braze/braze_instances/#braze-instances. Simply match your dashboard URL to the REST endpoint URL.  
 For example, if your dashboard shows `dashboard-01.braze.com/` URL, your REST endpoint would be `https://rest.iad-01.braze.com`.
 
-You can also find your REST API URL in the dashboard. Head over to your dashboard and in then the left panel, under _App Settings_, open _Manage App Group_.
+You can also find your REST API URL in the dashboard. In then the left navigation panel, scroll down and select **Manage App Group**.
 
 [img] _TODO: update after publishing to public repo_
 
-There you can find an `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would then be `rest.iad-01.braze.com`
+There you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `rest.iad-01.braze.com`
 
 #### API Key
 
-To connect with Braze servers, we also need an API key. This unique identifier allows Braze to verify your identity and upload your data. To get your API key, open the Dashboard and select _Developer Concole_ under _App Settings_.
+To connect with Braze servers, we also need an API key. This unique identifier allows Braze to verify your identity and upload your data. To get your API key, open the Dashboard and scroll down the left navigation section. Select **Developer Console** under _App Settings_.
 
 [img] _TODO: update after publishing to public repo_
 
@@ -48,54 +48,79 @@ You will need an API key that has a permission to post to `user.track` API endpo
 
 [img] _TODO: update after publishing to public repo_
 
-Next, name your API Key and select `users.track` under the _User Data_ endpoints group. Scroll down and click on `Save API Key`.
+Next, name your API Key and select `users.track` under the _User Data_ endpoints group. Scroll down and click on **Save API Key**.
 We will need this key shortly.
 
 ## Instructions
 
-### Steps Overview
+#### Steps Overview
 
 1. Deploy Braze's publicly available CSV processing Lambda from the AWS Serverless Application Repository (SAM)
-2. Drop a CSV file with user attributes in the newly created S3 bucket 
+2. Drop a CSV file with user attributes in the newly created S3 bucket
 3. The users will be automatically imported to Braze
 
 #### Deploy
 
-To start processing your User Attribute CSV files, we just have to deploy the Serverless Application that will handle the processing for you. This application will create the following resources automatically in order to successfully deploy:
+To start processing your User Attribute CSV files, we need to deploy the Serverless Application that will handle the processing for you. This application will create the following resources automatically in order to successfully deploy:
 
 - Lambda function
-- S3 Bucket for your CSV Files that the Lambda process can read from (_Note: this Lambda function will only receive notifications for `.csv` files_)
+- S3 Bucket for your CSV Files that the Lambda process can read from (_Note: this Lambda function will only receive notifications for `.csv` extension files_)
 - Role allowing for creation of the above
 - Policy to allow Lambda to receive S3 upload event in the new bucket
 
-Open the [AWS Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications). Note that you must check the `Show apps that create custom IAM roles and resource policies` checkbox in order to see this application. The application creates custom policy for the lambda to read from the newly created S3 bucket.
+Follow the direct link to the [Braze User CSV ](_TODO: Insert public link here_) or open the [AWS Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications) and search for _Braze User CSV Import_ (_TODO: Change to an official name_). Note that you must check the `Show apps that create custom IAM roles and resource policies` checkbox in order to see this application. The application creates a policy for the lambda to read from the newly created S3 bucket.
 
-Search for _TODO: Insert title of the application_.
+Click **Deploy** and let AWS create all the necessary resources.
 
-<a name="execution-time"></a>
+You can watch the deployment and verify that the stack (ie. all the required resources) is being created in the [CloudFormation](https://console.aws.amazon.com/cloudformation/). Find the stack named (_TODO: Update with the application name_). Once the **Status** turns to `CREATE_COMPLETE`, the function is ready to use. You can click on the stack and open **Resources** and watch the different resources being created.
+
+The following resources were created:
+
+- [S3 Bucket](https://s3.console.aws.amazon.com/s3/) - a bucket named `braze-user-csv-import-aaa123` where `aaa123` is a randomly generated string
+- [Lambda Function](https://console.aws.amazon.com/lambda/) - a lambda function named `braze-user-csv-import`
+- [IAM Role](https://console.aws.amazon.com/iam/) - policy named `braze-user-csv-import-BrazeCSVUserImportRole` to allow lambda to read from S3 and to print to logs
 
 #### Run
 
-..
+To run the function, drop a user attribute CSV file in the newly created S3 bucket.
 
-#### Monitor
+#### Monitoring and Logging
 
-..
+To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
+
+### Lambda Configuration
+
+By default, the function is created with 2048MB memory size. Lambda's CPU is proportional to the memory size. Even though, the script uses constant, low amount of memory, the stronger CPU power allows to process the file faster and send more requests simultaneously.  
+2GB was chosen as the best cost to performance ratio.  
+You can review Lambda pricing here: https://aws.amazon.com/lambda/pricing/.
+
+You can reduce or increase the amount of available memory for the function in the Lambda **Configuration** tab. Under _General configuration_, click **Edit**, specify the amount of desired memory and save.
+
+Keep in mind that any more memory above 2GB has diminishing returns where it might improve processing speed by 10-20% but at the same time doubling or tripling the cost.
+
+<a name="execution-times"></a>
 
 ## Estimated Execution Times
 
-Describe execution times..
+_2048MB Lambda Function_
 
-## Logging
+| # of rows | Exec. Time |
+| --------- | ---------- |
+| 10k       | 3s         |
+| 100k      | 30s        |
+| 1M        | 5 min      |
+| 5M        | 30 min     |
 
-Describe logging..
+<!-- ## What happens if the function fails?
+
+...
 
 ## Creating your own Lambda
 
-The serverless application creates the whole stack of services that work together, S3 bucket, policies and finally the Lambda function. If you want to use an existing bucket, it is not possible with the serverless application. However, you could create and deploy your own Lambda process instead. The steps below will guide you how to accomplish that.
+The serverless application creates the whole stack of services that work together, S3 bucket, policies and the Lambda function. If you want to use an existing bucket, it is not possible with the serverless application. However, you could create and deploy your own Lambda process instead. The steps below will guide you how to accomplish that.
 
 _TODO: Include .zip package in Releases_
 
-1. Download the packaged code from [Releases](INSERT_LINK)
+1. Download the packaged code from [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases)
 2. Create a new Lambda function
-3. ...
+3. ... -->
