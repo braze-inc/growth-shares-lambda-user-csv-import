@@ -27,7 +27,7 @@ Globals:
     Timeout: 900
 
 Resources:
-  TestBucket:
+  BrazeUserImportBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Join
@@ -60,7 +60,7 @@ Resources:
         S3Event:
           Type: S3
           Properties:
-            Bucket: !Ref TestBucket
+            Bucket: !Ref BrazeUserImportBucket
             Events: s3:ObjectCreated:*
             Filter:
               S3Key:
