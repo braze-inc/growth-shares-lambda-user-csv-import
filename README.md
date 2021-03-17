@@ -34,7 +34,9 @@ For example, if your dashboard shows `dashboard-01.braze.com/` URL, your REST en
 
 You can also find your REST API URL in the dashboard. In then the left navigation panel, scroll down and select **Manage App Group**.
 
-[img] _TODO: update after publishing to public repo_
+<img src="./img/manage-app-group.png" width="200">
+
+ <!-- <img src="https://github.com/braze-inc/growth-shares-lambda-user-csv-import/blob/master/img/create-bucket.png"> -->
 
 There you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `rest.iad-01.braze.com`
 
@@ -42,11 +44,11 @@ There you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your RE
 
 To connect with Braze servers, we also need an API key. This unique identifier allows Braze to verify your identity and upload your data. To get your API key, open the Dashboard and scroll down the left navigation section. Select **Developer Console** under _App Settings_.
 
-[img] _TODO: update after publishing to public repo_
+<img src="./img/developer-console.png" width="200">
 
 You will need an API key that has a permission to post to `user.track` API endpoint. If you know one of your API keys supports that endpoint, you can use that key. To create a new one, click on `Create New API Key` on the right side of your screen.
 
-[img] _TODO: update after publishing to public repo_
+<img src="./img/create-key.png" width="200">
 
 Next, name your API Key and select `users.track` under the _User Data_ endpoints group. Scroll down and click on **Save API Key**.
 We will need this key shortly.
@@ -88,7 +90,7 @@ To run the function, drop a user attribute CSV file in the newly created S3 buck
 
 To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
 
-### Lambda Configuration
+#### Lambda Configuration
 
 By default, the function is created with 2048MB memory size. Lambda's CPU is proportional to the memory size. Even though, the script uses constant, low amount of memory, the stronger CPU power allows to process the file faster and send more requests simultaneously.  
 2GB was chosen as the best cost to performance ratio.  
