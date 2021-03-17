@@ -69,10 +69,12 @@ def lambda_handler(event, context):
     try:
         csv_processor.process_file(context)
     except FatalAPIError as e:
-        _handle_fatal_api_error(e, csv_processor.processed_users)
+        _handle_fatal_error("Posting data has failed due to an API error",
+                            str(e), csv_processor.processed_users)
         raise
     except Exception as e:
-        _handle_unexpected_error(e, csv_processor.processed_users)
+        _handle_fatal_error("Unexpected error", str(e),
+                            csv_processor.processed_users)
         raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
@@ -341,17 +343,10 @@ def _delay():
     sleep(2**RETRIES)
 
 
-def _handle_fatal_api_error(e: Exception, processed_users: int):
-    """Prints logging information -- error message and number of users
-    processed before the fatal API error."""
-    print(f"Posting data has failed due to an API error: {str(e)}")
-    print(f"Processed {processed_users:,} users.")
-
-
-def _handle_unexpected_error(e: Exception, processed_users: int):
-    """Prints logging information -- error message and number of users
-    processed before the unexpected error."""
-    print(f"Unexpected error: {str(e)}")
+def _handle_fatal_error(error_message: str, error_output: str,
+                        processed_users: int) -> None:
+    """Prints logging information when a fatal error occurred."""
+    print(f"{error_message}: {error_output}")
     print(f"Processed {processed_users:,} users.")
 
 
