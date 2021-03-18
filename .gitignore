@@ -12,6 +12,6 @@ __pycache__/
 
 # SAM
 .aws-sam
-
 packaged.yaml
 samconfig.toml
+*.zip
