@@ -72,21 +72,22 @@ def lambda_handler(event, context):
     except FatalAPIError as e:
         _handle_fatal_error("Posting data has failed due to an API error",
                             str(e), csv_processor.processed_users,
-                            csv_processor.offset)
+                            csv_processor.total_offset)
         raise
     except Exception as e:
         _handle_fatal_error("Unexpected error", str(e),
-                            csv_processor.processed_users, csv_processor.offset)
+                            csv_processor.processed_users,
+                            csv_processor.total_offset)
         raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
     if not csv_processor.is_finished():
         _start_next_process(context.function_name, event,
-                            csv_processor.offset, csv_processor.headers)
+                            csv_processor.total_offset, csv_processor.headers)
 
     return {
         "users_processed": csv_processor.processed_users,
-        "bytes_read": csv_processor.offset - event.get("offset", 0),
+        "bytes_read": csv_processor.total_offset - event.get("offset", 0),
         "is_finished": csv_processor.is_finished()
     }
 
@@ -103,7 +104,8 @@ class CsvProcessor:
 
     def __init__(self, bucket_name: str, object_key: str,
                  offset: int = 0, headers: List[str] = None) -> None:
-        self.offset = offset
+        self.processing_offset = 0
+        self.total_offset = offset
         self.csv_file = _get_file_from_s3(bucket_name, object_key)
         self.headers = headers
 
@@ -152,18 +154,18 @@ class CsvProcessor:
         Reads chunks of data (1,024 bytes) by default, and splits it into lines.
         Yields each line separately.
         """
-        object_stream = _get_object_stream(self.csv_file, self.offset)
+        object_stream = _get_object_stream(self.csv_file, self.total_offset)
         leftover = b""
         for chunk in object_stream.iter_chunks():
             data = leftover + chunk
             last_newline = data.rfind(b"\n")
             data, leftover = data[:last_newline], data[last_newline:]
             for line in data.splitlines(keepends=True):
-                self.offset += len(line)
+                self.processing_offset += len(line)
                 yield line.decode("utf-8")
 
         if leftover == b'\n':
-            self.offset += len(leftover)
+            self.total_offset += len(leftover)
 
     def post_users(self, user_chunks: List[List]) -> None:
         """Posts updated users to Braze platform using Braze API.
@@ -173,10 +175,15 @@ class CsvProcessor:
         """
         updated = _post_users(user_chunks)
         self.processed_users += updated
+        self._move_offset()
 
     def is_finished(self) -> bool:
         """Returns whether the end of file was reached."""
-        return self.offset >= self.csv_file.content_length
+        return self.total_offset >= self.csv_file.content_length
+
+    def _move_offset(self) -> None:
+        self.total_offset += self.processing_offset
+        self.processing_offset = 0
 
 
 def _get_file_from_s3(bucket_name: str, object_key: str):
