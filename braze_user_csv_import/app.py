@@ -22,6 +22,7 @@ import ast
 import json
 from time import sleep
 from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from typing import Dict, Iterator, List
 
 import requests
@@ -70,11 +71,12 @@ def lambda_handler(event, context):
         csv_processor.process_file(context)
     except FatalAPIError as e:
         _handle_fatal_error("Posting data has failed due to an API error",
-                            str(e), csv_processor.processed_users)
+                            str(e), csv_processor.processed_users,
+                            csv_processor.offset)
         raise
     except Exception as e:
         _handle_fatal_error("Unexpected error", str(e),
-                            csv_processor.processed_users)
+                            csv_processor.processed_users, csv_processor.offset)
         raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
@@ -223,15 +225,16 @@ def _process_row(user_row: Dict) -> None:
 
 def _post_users(user_chunks: List[List]) -> int:
     """Posts users concurrently to Braze API, using `MAX_THREADS` concurrent
-    threads. 
+    threads.
 
-    In case of a server error, or in case of Too Many Requests (429) 
-    client error, the function will employ exponential delay stall and try 
+    In case of a server error, or in case of Too Many Requests (429)
+    client error, the function will employ exponential delay stall and try
     again.
 
     :return: Number of users successfully updated
     """
     updated = 0
+    # succeeded = skip_indexes or []
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
         try:
             results = executor.map(_post_to_braze, user_chunks)
@@ -240,6 +243,17 @@ def _post_users(user_chunks: List[List]) -> int:
         except APIRetryError:
             _delay()
             return _post_users(user_chunks)
+        # future_to_chunk_index = {executor.submit(
+        #     _post_to_braze, user_chunk): i for i, user_chunk in enumerate(user_chunks)}
+        #   for future in as_completed(future_to_chunk_index):
+        #        try:
+        #             processed_users = future.result()
+        #             updated += processed_users
+        #             succeeded.append(future_to_chunk_index[future])
+        #         except APIRetryError:
+        #             _delay()
+        #             return _post_users(user_chunks, succeeded)
+
     return updated
 
 
@@ -352,10 +366,13 @@ def _delay():
 
 
 def _handle_fatal_error(error_message: str, error_output: str,
-                        processed_users: int) -> None:
+                        processed_users: int, byte_offset: int) -> None:
     """Prints logging information when a fatal error occurred."""
     print(f"{error_message}: {error_output}")
     print(f"Processed {processed_users:,} users.")
+    # TODO: Currently this returns progressed offset even if the streamed chunk
+    # failed!
+    print(f"Byte offset: {byte_offset}")
 
 
 class APIRetryError(Exception):
