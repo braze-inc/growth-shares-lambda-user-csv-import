@@ -3,6 +3,33 @@ import pytest
 from braze_user_csv_import import app
 
 
+def test_lambda_handler_fails_assert_event_logged(mocker, capsys):
+    headers = ['header1', 'header2']
+    offset = 7256
+    event = {"Records": [
+        {"s3": {"bucket": {"name": "test"}, "object": {"key": "test"}}}]}
+
+    # Mock CsvProcessor
+    mock_processor = mocker.MagicMock(headers=headers, total_offset=offset,
+                                      processed_users=999)
+    # Set off fatal exception during file processing
+    mock_processor.process_file.side_effect = app.FatalAPIError("Test error")
+
+    # Apply the mock
+    mock_processor = mocker.patch('braze_user_csv_import.app.CsvProcessor',
+                                  return_value=mock_processor)
+
+    # Expect a fatal exception
+    with pytest.raises(app.FatalAPIError):
+        app.lambda_handler(event, None)
+
+    # Confirm that event gets logged
+    out, err = capsys.readouterr()
+    new_event = {**event, "offset": offset, "headers": headers}
+    assert "Encountered error: Test error" in out
+    assert f"{new_event}" in out
+
+
 def test_successful_import_offset_progresses(mocker, users, csv_processor):
     mocker.patch('braze_user_csv_import.app._post_users', return_value=75)
     chunks = [users] * 5

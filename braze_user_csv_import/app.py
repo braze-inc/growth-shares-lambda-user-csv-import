@@ -351,12 +351,21 @@ def _start_next_process(function_name: str, event: Dict, offset: int,
     :param headers: The headers in the CSV file
     """
     print("Starting new user processing lambda..")
-    new_event = {**event, "offset": offset, "headers": headers}
+    new_event = _create_event(event, offset, headers)
     boto3.client("lambda").invoke(
         FunctionName=function_name,
         InvocationType="Event",
         Payload=json.dumps(new_event),
     )
+
+
+def _create_event(received_event: Dict, byte_offset: int,
+                  headers: List[str]) -> Dict:
+    return {
+        **received_event,
+        "offset": byte_offset,
+        "headers": headers
+    }
 
 
 def _should_terminate(context) -> bool:
