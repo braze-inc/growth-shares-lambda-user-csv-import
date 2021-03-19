@@ -26,6 +26,8 @@ from typing import Dict, Iterator, List
 
 import requests
 import boto3
+from urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
 
 # 12 minute function timeout
 FUNCTION_RUN_TIME = 12 * 60 * 1_000
@@ -248,19 +250,27 @@ def _post_to_braze(users: List[Dict]) -> int:
     to the lambda process as an environment variable, under `BRAZE_API_KEY` key.
     In case of a lack of valid API Key, the function will fail.
 
+    Each request is retried 3 times. This retry session takes place in each
+    thread individually and it is independent of the global retry strategy.
+
     :return: The number of users successfully imported
     """
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {BRAZE_API_KEY}",
-    }
+    headers = {"Content-Type": "application/json",
+               "Authorization": f"Bearer {BRAZE_API_KEY}", }
     data = json.dumps({"attributes": users})
-    res = requests.post(
-        f"{BRAZE_API_URL}/users/track", headers=headers, data=data
-    )
-
-    error_users = _handle_braze_response(res)
+    session = _start_retry_session()
+    response = session.post(f"{BRAZE_API_URL}/users/track",
+                            headers=headers, data=data)
+    error_users = _handle_braze_response(response)
     return len(users) - error_users
+
+
+def _start_retry_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(total=5, backoff_factor=0.25)
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('https://', adapter)
+    return session
 
 
 def _handle_braze_response(response: requests.Response) -> int:
