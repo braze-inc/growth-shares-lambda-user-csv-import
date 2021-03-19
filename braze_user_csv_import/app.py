@@ -29,8 +29,8 @@ import boto3
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
-# 12 minute function timeout
-FUNCTION_RUN_TIME = 12 * 60 * 1_000
+# 10 minute function timeout
+FUNCTION_RUN_TIME = 10 * 60 * 1_000
 
 # Remaining time threshold to end execution. 900_000 seconds is equal to
 # 15 minutes which is the maximum lambda execution time
