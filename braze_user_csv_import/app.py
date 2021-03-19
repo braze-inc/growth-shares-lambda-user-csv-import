@@ -16,17 +16,15 @@ platform as the processing goes on, in 75 user chunks which is the maximum
 amount of users supported by the Braze API.
 """
 
-import sys
 import csv
 import os
 import ast
 import json
-import requests
 from time import sleep
-from threading import Lock
 from concurrent.futures.thread import ThreadPoolExecutor
 from typing import Dict, Iterator, List
 
+import requests
 import boto3
 
 # 12 minute function timeout
