@@ -52,7 +52,7 @@ def test_failed_import_offset_does_not_progress(mocker, users, csv_processor):
     assert csv_processor.total_offset == 0
 
 
-def test_posting_users_fails_one_some_users_assert_calls_not_repeated(mocker):
+def test_posting_users_fails_some_users_assert_calls_not_repeated(mocker):
     pass
 
 

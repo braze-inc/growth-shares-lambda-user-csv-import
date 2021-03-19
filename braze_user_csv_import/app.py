@@ -69,15 +69,10 @@ def lambda_handler(event, context):
 
     try:
         csv_processor.process_file(context)
-    except FatalAPIError as e:
-        _handle_fatal_error("Posting data has failed due to an API error",
-                            str(e), csv_processor.processed_users,
-                            csv_processor.total_offset)
-        raise
     except Exception as e:
-        _handle_fatal_error("Unexpected error", str(e),
-                            csv_processor.processed_users,
-                            csv_processor.total_offset)
+        event = _create_event(event, csv_processor.total_offset,
+                              csv_processor.headers)
+        _handle_fatal_error(str(e), csv_processor.processed_users, event)
         raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
@@ -330,7 +325,7 @@ def _handle_braze_response(response: requests.Response) -> int:
     server_error = response.status_code == 429 or response.status_code >= 500
     should_retry = server_error and RETRIES < MAX_API_RETRIES
     if server_error and not should_retry:
-        raise FatalAPIError("Too many requests")
+        raise FatalAPIError("Too many requests.")
 
     if server_error:
         raise APIRetryError
@@ -381,14 +376,12 @@ def _delay():
     sleep(2**RETRIES)
 
 
-def _handle_fatal_error(error_message: str, error_output: str,
-                        processed_users: int, byte_offset: int) -> None:
+def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -> None:
     """Prints logging information when a fatal error occurred."""
-    print(f"{error_message}: {error_output}")
+    print(f"Encountered error: {error_message}")
     print(f"Processed {processed_users:,} users.")
-    # TODO: Currently this returns progressed offset even if the streamed chunk
-    # failed!
-    print(f"Byte offset: {byte_offset}")
+    print(f"Use the event below to continue processing the file:")
+    print(event)
 
 
 class APIRetryError(Exception):
