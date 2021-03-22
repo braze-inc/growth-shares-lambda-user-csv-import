@@ -267,7 +267,7 @@ def _post_to_braze(users: List[Dict]) -> int:
 
 def _start_retry_session() -> requests.Session:
     session = requests.Session()
-    retry = Retry(total=5, backoff_factor=0.25)
+    retry = Retry(total=3, backoff_factor=0.5)
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('https://', adapter)
     return session
