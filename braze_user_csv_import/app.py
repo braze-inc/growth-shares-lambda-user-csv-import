@@ -287,7 +287,7 @@ def _handle_braze_response(response: requests.Response) -> int:
     logged. In case the API received data in an unexpected format, the data 
     that caused the issue will be logged.
 
-    In any unexpected client API error (other than 300), the function execution 
+    In any unexpected client API error (other than 400), the function execution 
     will terminate.
 
     :param response: Response from the API
