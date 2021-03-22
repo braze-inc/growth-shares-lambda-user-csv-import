@@ -113,6 +113,21 @@ _2048MB Lambda Function_
 | 1M        | 5 min      |
 | 5M        | 30 min     |
 
+<br>
+
+# Contributing and Testing
+
+In order to run tests, install
+
+    pip install pytest pytest-mock pytest-env
+
+And run
+
+    pytest
+
+Contributions are welcome.
+
+
 <!-- ## What happens if the function fails?
 
 ...
