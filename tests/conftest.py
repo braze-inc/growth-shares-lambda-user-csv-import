@@ -1,5 +1,7 @@
 import pytest
 
+from braze_user_csv_import import app
+
 
 @pytest.fixture
 def mock_file_upload_event():
@@ -48,3 +50,13 @@ def mock_file_upload_event():
 def users():
     return [{"external_id": 1, "attribute1": "value1"},
             {"external_id": 2, "attribute1": "value2"}]
+
+
+@pytest.fixture
+def csv_processor():
+    return app.CsvProcessor(
+        bucket_name="test",
+        object_key="test",
+        offset=0,
+        headers=None
+    )

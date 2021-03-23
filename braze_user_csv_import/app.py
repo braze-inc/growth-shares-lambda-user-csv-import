@@ -22,6 +22,7 @@ import ast
 import json
 from time import sleep
 from concurrent.futures.thread import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from typing import Dict, Iterator, List
 
 import requests
@@ -68,23 +69,20 @@ def lambda_handler(event, context):
 
     try:
         csv_processor.process_file(context)
-    except FatalAPIError as e:
-        _handle_fatal_error("Posting data has failed due to an API error",
-                            str(e), csv_processor.processed_users)
-        raise
     except Exception as e:
-        _handle_fatal_error("Unexpected error", str(e),
-                            csv_processor.processed_users)
+        event = _create_event(event, csv_processor.total_offset,
+                              csv_processor.headers)
+        _handle_fatal_error(str(e), csv_processor.processed_users, event)
         raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
     if not csv_processor.is_finished():
         _start_next_process(context.function_name, event,
-                            csv_processor.offset, csv_processor.headers)
+                            csv_processor.total_offset, csv_processor.headers)
 
     return {
         "users_processed": csv_processor.processed_users,
-        "bytes_read": csv_processor.offset - event.get("offset", 0),
+        "bytes_read": csv_processor.total_offset - event.get("offset", 0),
         "is_finished": csv_processor.is_finished()
     }
 
@@ -101,7 +99,8 @@ class CsvProcessor:
 
     def __init__(self, bucket_name: str, object_key: str,
                  offset: int = 0, headers: List[str] = None) -> None:
-        self.offset = offset
+        self.processing_offset = 0
+        self.total_offset = offset
         self.csv_file = _get_file_from_s3(bucket_name, object_key)
         self.headers = headers
 
@@ -150,18 +149,18 @@ class CsvProcessor:
         Reads chunks of data (1,024 bytes) by default, and splits it into lines.
         Yields each line separately.
         """
-        object_stream = _get_object_stream(self.csv_file, self.offset)
+        object_stream = _get_object_stream(self.csv_file, self.total_offset)
         leftover = b""
         for chunk in object_stream.iter_chunks():
             data = leftover + chunk
             last_newline = data.rfind(b"\n")
             data, leftover = data[:last_newline], data[last_newline:]
             for line in data.splitlines(keepends=True):
-                self.offset += len(line)
+                self.processing_offset += len(line)
                 yield line.decode("utf-8")
 
         if leftover == b'\n':
-            self.offset += len(leftover)
+            self.total_offset += len(leftover)
 
     def post_users(self, user_chunks: List[List]) -> None:
         """Posts updated users to Braze platform using Braze API.
@@ -171,10 +170,15 @@ class CsvProcessor:
         """
         updated = _post_users(user_chunks)
         self.processed_users += updated
+        self._move_offset()
 
     def is_finished(self) -> bool:
         """Returns whether the end of file was reached."""
-        return self.offset >= self.csv_file.content_length
+        return self.total_offset >= self.csv_file.content_length
+
+    def _move_offset(self) -> None:
+        self.total_offset += self.processing_offset
+        self.processing_offset = 0
 
 
 def _get_file_from_s3(bucket_name: str, object_key: str):
@@ -223,15 +227,16 @@ def _process_row(user_row: Dict) -> None:
 
 def _post_users(user_chunks: List[List]) -> int:
     """Posts users concurrently to Braze API, using `MAX_THREADS` concurrent
-    threads. 
+    threads.
 
-    In case of a server error, or in case of Too Many Requests (429) 
-    client error, the function will employ exponential delay stall and try 
+    In case of a server error, or in case of Too Many Requests (429)
+    client error, the function will employ exponential delay stall and try
     again.
 
     :return: Number of users successfully updated
     """
     updated = 0
+    # succeeded = skip_indexes or []
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
         try:
             results = executor.map(_post_to_braze, user_chunks)
@@ -240,6 +245,17 @@ def _post_users(user_chunks: List[List]) -> int:
         except APIRetryError:
             _delay()
             return _post_users(user_chunks)
+        # future_to_chunk_index = {executor.submit(
+        #     _post_to_braze, user_chunk): i for i, user_chunk in enumerate(user_chunks)}
+        #   for future in as_completed(future_to_chunk_index):
+        #        try:
+        #             processed_users = future.result()
+        #             updated += processed_users
+        #             succeeded.append(future_to_chunk_index[future])
+        #         except APIRetryError:
+        #             _delay()
+        #             return _post_users(user_chunks, succeeded)
+
     return updated
 
 
@@ -309,14 +325,14 @@ def _handle_braze_response(response: requests.Response) -> int:
     server_error = response.status_code == 429 or response.status_code >= 500
     should_retry = server_error and RETRIES < MAX_API_RETRIES
     if server_error and not should_retry:
-        raise FatalAPIError("Too many requests")
+        raise FatalAPIError("Too many requests.")
 
     if server_error:
         raise APIRetryError
 
     if response.status_code > 400:
-        raise FatalAPIError(response.text)
-
+        raise FatalAPIError(res_text.get('message', response.text))
+    
     return 0
 
 
@@ -330,12 +346,21 @@ def _start_next_process(function_name: str, event: Dict, offset: int,
     :param headers: The headers in the CSV file
     """
     print("Starting new user processing lambda..")
-    new_event = {**event, "offset": offset, "headers": headers}
+    new_event = _create_event(event, offset, headers)
     boto3.client("lambda").invoke(
         FunctionName=function_name,
         InvocationType="Event",
         Payload=json.dumps(new_event),
     )
+
+
+def _create_event(received_event: Dict, byte_offset: int,
+                  headers: List[str]) -> Dict:
+    return {
+        **received_event,
+        "offset": byte_offset,
+        "headers": headers
+    }
 
 
 def _should_terminate(context) -> bool:
@@ -351,11 +376,12 @@ def _delay():
     sleep(2**RETRIES)
 
 
-def _handle_fatal_error(error_message: str, error_output: str,
-                        processed_users: int) -> None:
+def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -> None:
     """Prints logging information when a fatal error occurred."""
-    print(f"{error_message}: {error_output}")
-    print(f"Processed {processed_users:,} users.")
+    print(f'Encountered error "{error_message}"')
+    print(f"Processed {processed_users:,} users")
+    print(f"Use the event below to continue processing the file:")
+    print(json.dumps(event))
 
 
 class APIRetryError(Exception):
