@@ -14,7 +14,7 @@ where the first column must specify the external ID of the user to be updated an
 
 ### CSV Processing
 
-Any values in an array (ex. `"['Value1', 'Value2']"` will be automatically destructured and sent to the API in an array rather than a string of representation of an array.
+Any values in an array (ex. `"['Value1', 'Value2']"` will be automatically destructured and sent to the API in an array rather than a string representation of an array.
 
 ## Requirements
 
@@ -80,7 +80,7 @@ The following resources were created:
 
 - [S3 Bucket](https://s3.console.aws.amazon.com/s3/) - a bucket named `braze-user-csv-import-aaa123` where `aaa123` is a randomly generated string
 - [Lambda Function](https://console.aws.amazon.com/lambda/) - a lambda function named `braze-user-csv-import`
-- [IAM Role](https://console.aws.amazon.com/iam/) - policy named `braze-user-csv-import-BrazeCSVUserImportRole` to allow lambda to read from S3 and to print to logs
+- [IAM Role](https://console.aws.amazon.com/iam/) - policy named `braze-user-csv-import-BrazeCSVUserImportRole` to allow lambda to read from S3 and to log function output
 
 #### Run
 
