@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from braze_user_csv_import import app
@@ -24,10 +26,10 @@ def test_lambda_handler_fails_assert_event_logged(mocker, capsys):
         app.lambda_handler(event, None)
 
     # Confirm that event gets logged
-    out, err = capsys.readouterr()
-    new_event = {**event, "offset": offset, "headers": headers}
-    assert "Encountered error: Test error" in out
-    assert f"{new_event}" in out
+    logs, err = capsys.readouterr()
+    new_event = json.dumps({**event, "offset": offset, "headers": headers})
+    assert 'Encountered error "Test error"' in logs
+    assert f"{new_event}" in logs
 
 
 def test_successful_import_offset_progresses(mocker, users, csv_processor):

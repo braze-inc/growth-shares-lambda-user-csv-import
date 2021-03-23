@@ -331,8 +331,8 @@ def _handle_braze_response(response: requests.Response) -> int:
         raise APIRetryError
 
     if response.status_code > 400:
-        raise FatalAPIError(response.text)
-
+        raise FatalAPIError(res_text.get('message', response.text))
+    
     return 0
 
 
@@ -378,10 +378,10 @@ def _delay():
 
 def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -> None:
     """Prints logging information when a fatal error occurred."""
-    print(f"Encountered error: {error_message}")
-    print(f"Processed {processed_users:,} users.")
+    print(f'Encountered error "{error_message}"')
+    print(f"Processed {processed_users:,} users")
     print(f"Use the event below to continue processing the file:")
-    print(event)
+    print(json.dumps(event))
 
 
 class APIRetryError(Exception):
