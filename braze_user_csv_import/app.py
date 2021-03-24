@@ -73,7 +73,7 @@ def lambda_handler(event, context):
         event = _create_event(event, csv_processor.total_offset,
                               csv_processor.headers)
         _handle_fatal_error(str(e), csv_processor.processed_users, event)
-        raise
+        return
 
     print(f"Processed {csv_processor.processed_users:,} users.")
     if not csv_processor.is_finished():

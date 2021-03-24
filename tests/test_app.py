@@ -21,9 +21,8 @@ def test_lambda_handler_fails_assert_event_logged(mocker, capsys):
     mock_processor = mocker.patch('braze_user_csv_import.app.CsvProcessor',
                                   return_value=mock_processor)
 
-    # Expect a fatal exception
-    with pytest.raises(app.FatalAPIError):
-        app.lambda_handler(event, None)
+    # Expect a fatal exception, returns None
+    assert None == app.lambda_handler(event, None)
 
     # Confirm that event gets logged
     logs, err = capsys.readouterr()
