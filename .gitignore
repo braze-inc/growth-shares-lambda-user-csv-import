@@ -14,5 +14,7 @@ __pycache__/
 .aws-sam
 packaged.yaml
 samconfig.toml
-/build
+build/
 *.zip
+events/*
+!events/sample-event.json
