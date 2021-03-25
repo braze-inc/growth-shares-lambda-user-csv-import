@@ -1,7 +1,7 @@
 # User Attribute CSV to Braze Ingestion
 
-This serverless application allows you to easily deploy a Lambda process that will post user attribute data from a CSV file directly to Braze using Braze Rest API endpoint [User Track](https://www.braze.com/docs/api/endpoints/user_data/post_user_track/). The process launches immediately when you upload a CSV file to the AWS S3 bucket.  
-It can handle large files and uploads. However, it is important to keep in mind that due to Lambda's time limits, the function will stop execution after 12 minutes. The process will launch another Lambda instance to finish processing the remaining of the file. For more details about function timing, checkout [Execution Times](#execution-times).
+This serverless application allows you to easily deploy a Lambda process that will post user attribute data from a CSV file directly to Braze using Braze Rest API endpoint [User Track](https://www.braze.com/docs/api/endpoints/user_data/post_user_track/). The process launches immediately when you upload a CSV file to the configured AWS S3 bucket.  
+It can handle large files and uploads. However, it is important to keep in mind that due to Lambda's time limits, the function will stop execution after 10 minutes. The process will launch another Lambda instance to finish processing the remaining of the file. For more details about function timing, checkout [Execution Times](#execution-times).
 
 ### CSV User Attributes
 
@@ -34,21 +34,21 @@ For example, if your dashboard shows `dashboard-01.braze.com/` URL, your REST en
 
 You can also find your REST API URL in the dashboard. In then the left navigation panel, scroll down and select **Manage App Group**.
 
-<img src="./img/manage-app-group.png" width="200">
+<img src="./img/manage-app-group.png" width="200" style="border: 1px solid lightgray;">
 
  <!-- <img src="https://github.com/braze-inc/growth-shares-lambda-user-csv-import/blob/master/img/create-bucket.png"> -->
 
-There you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `rest.iad-01.braze.com`
+There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `rest.iad-01.braze.com`
 
 #### API Key
 
 To connect with Braze servers, we also need an API key. This unique identifier allows Braze to verify your identity and upload your data. To get your API key, open the Dashboard and scroll down the left navigation section. Select **Developer Console** under _App Settings_.
 
-<img src="./img/developer-console.png" width="200">
+<img src="./img/developer-console.png" width="200" style="border: 1px solid lightgray;">
 
 You will need an API key that has a permission to post to `user.track` API endpoint. If you know one of your API keys supports that endpoint, you can use that key. To create a new one, click on `Create New API Key` on the right side of your screen.
 
-<img src="./img/create-key.png" width="200">
+<img src="./img/create-key.png" width="200" style="border: 1px solid lightgray;">
 
 Next, name your API Key and select `users.track` under the _User Data_ endpoints group. Scroll down and click on **Save API Key**.
 We will need this key shortly.
@@ -57,7 +57,7 @@ We will need this key shortly.
 
 #### Steps Overview
 
-1. Deploy Braze's publicly available CSV processing Lambda from the AWS Serverless Application Repository (SAM)
+1. Deploy Braze's publicly available CSV processing Lambda from the AWS Serverless Application Repository
 2. Drop a CSV file with user attributes in the newly created S3 bucket
 3. The users will be automatically imported to Braze
 
@@ -70,17 +70,17 @@ To start processing your User Attribute CSV files, we need to deploy the Serverl
 - Role allowing for creation of the above
 - Policy to allow Lambda to receive S3 upload event in the new bucket
 
-Follow the direct link to the [Braze User CSV ](_TODO: Insert public link here_) or open the [AWS Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications) and search for _Braze User CSV Import_ (_TODO: Change to an official name_). Note that you must check the `Show apps that create custom IAM roles and resource policies` checkbox in order to see this application. The application creates a policy for the lambda to read from the newly created S3 bucket.
+Follow the direct link to the [Application](_TODO: Insert public link here_) or open the [AWS Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications) and search for _braze-user-attribute-import_. Note that you must check the `Show apps that create custom IAM roles and resource policies` checkbox in order to see this application. The application creates a policy for the lambda to read from the newly created S3 bucket.
 
 Click **Deploy** and let AWS create all the necessary resources.
 
-You can watch the deployment and verify that the stack (ie. all the required resources) is being created in the [CloudFormation](https://console.aws.amazon.com/cloudformation/). Find the stack named (_TODO: Update with the application name_). Once the **Status** turns to `CREATE_COMPLETE`, the function is ready to use. You can click on the stack and open **Resources** and watch the different resources being created.
+You can watch the deployment and verify that the stack (ie. all the required resources) is being created in the [CloudFormation](https://console.aws.amazon.com/cloudformation/). Find the stack named _serverlessrepo-braze-user-attribute-import_. Once the **Status** turns to `CREATE_COMPLETE`, the function is ready to use. You can click on the stack and open **Resources** and watch the different resources being created.
 
 The following resources were created:
 
 - [S3 Bucket](https://s3.console.aws.amazon.com/s3/) - a bucket named `braze-user-csv-import-aaa123` where `aaa123` is a randomly generated string
-- [Lambda Function](https://console.aws.amazon.com/lambda/) - a lambda function named `braze-user-csv-import`
-- [IAM Role](https://console.aws.amazon.com/iam/) - policy named `braze-user-csv-import-BrazeCSVUserImportRole` to allow lambda to read from S3 and to log function output
+- [Lambda Function](https://console.aws.amazon.com/lambda/) - a lambda function named `braze-user-attribute-import`
+- [IAM Role](https://console.aws.amazon.com/iam/) - policy named `braze-user-csv-import-BrazeUserCSVImportRole` to allow lambda to read from S3 and to log function output
 
 #### Run
 

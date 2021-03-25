@@ -5,9 +5,9 @@ Description: >
 
 Metadata:
   AWS::ServerlessRepo::Application:
-    Name: braze-user-csv-import
-    Description: Processes User Attribute CSV files
-    Author: Maciej Olko
+    Name: braze-user-attribute-import
+    Description: Processes user attribute CSV files and imports them to Braze
+    Author: Braze
     SpdxLicenseId: MIT
     LicenseUrl: LICENSE.txt
     ReadmeUrl: README.md
@@ -19,8 +19,10 @@ Metadata:
 Parameters:
   BrazeAPIKey:
     Type: String
+    Description: Braze API Key necessary to authorize the connection
   BrazeAPIURL:
     Type: String
+    Description: Braze API URL necessary to connect to Braze servers
 
 Globals:
   Function:
@@ -32,7 +34,7 @@ Resources:
     Properties:
       BucketName: !Join
         - "-"
-        - - "braze-user-csv-ingest"
+        - - "braze-user-csv-import"
           - !Select
             - 0
             - !Split
@@ -42,8 +44,10 @@ Resources:
                 - !Split
                   - "/"
                   - !Ref "AWS::StackId"
+    Metadata:
+      Description: Uploading a CSV file to this bucket will trigger the User Attribute processing Lambda
 
-  BrazeCSVUserImport:
+  BrazeUserCSVImport:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: braze-user-csv-import
@@ -71,7 +75,7 @@ Resources:
         - S3ReadPolicy:
             BucketName: !Join
               - "-"
-              - - "braze-user-csv-ingest"
+              - - "braze-user-csv-import"
                 - !Select
                   - 0
                   - !Split
