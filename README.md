@@ -86,6 +86,7 @@ The following resources were created:
 
 To run the function, drop a user attribute CSV file in the newly created S3 bucket.
 
+<a name="monitoring"></a>
 #### Monitoring and Logging
 
 To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
@@ -115,6 +116,41 @@ _2048MB Lambda Function_
 
 <br>
 
+
+<!-- ## Manual Function Deploy
+
+1. Download the packaged code from [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases)
+2. Create a new Lambda function
+3. ... -->
+
+## Fatal Error
+
+In case of an unexpected error that prevents further processing of the file, an event is logged (accessible through CloudWatch described in [Monitoring and Logging](#monitoring)) that can be used to restart the Lambda from the point where the program stopped processing the file. It is important not to re-import the same data to save Data Points. You can find the instructions how to do that below.
+## Manual Triggers
+
+In case you wanted to trigger the Lambda manually, for testing or due to processing error, you can do it from the AWS Lambda Console using a test event.  
+Open the Braze User Import Lambda in the the AWS console by opening Lambda service and selecting `braze-user-csv-import` function. Navigate to **Test**. 
+
+<img src="./img/lambda-console-test.png" width="500" style="border: 1px solid lightgray;">
+
+#### Event 
+
+If you have an event from a returned exception, paste it in the **Test event**. Otherwise, copy the contents of [`sample-event.json`](/events/sample-event.json). Replace the following values:
+
+1. `"awsRegion"` under `"Records"`, replace `"your-region" with the proper region of the bucket with the file
+2. `"name"` and `"arn"` under `"bucket"`, replace **only** `lambda-bucket-name` with the bucket name that CSV files are read from (the bucket that triggers this Lambda)
+3. `"key"` under `"object"` with the CSV file key
+
+*Optional*:
+- `"offset"` field specifies the byte offset to start reading the file from
+- `"headers"` field specifies CSV headers and it is mandatory if the file is not being read from the beginning 
+
+#### Invoke
+
+To invoke the function, press `Invoke` and wait for the execution to finish.
+
+
+
 # Contributing and Testing
 
 In order to run tests, install
@@ -127,17 +163,3 @@ And run
 
 Contributions are welcome.
 
-
-<!-- ## What happens if the function fails?
-
-...
-
-## Creating your own Lambda
-
-The serverless application creates the whole stack of services that work together, S3 bucket, policies and the Lambda function. If you want to use an existing bucket, it is not possible with the serverless application. However, you could create and deploy your own Lambda process instead. The steps below will guide you how to accomplish that.
-
-_TODO: Include .zip package in Releases_
-
-1. Download the packaged code from [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases)
-2. Create a new Lambda function
-3. ... -->
