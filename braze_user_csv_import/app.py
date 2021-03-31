@@ -47,8 +47,6 @@ BRAZE_API_KEY = os.environ['BRAZE_API_KEY']
 if BRAZE_API_URL[-1] == '/':
     BRAZE_API_URL = BRAZE_API_URL[:-1]
 
-# re_array_column = re.compile(r"^\[(.+)\]$")
-
 
 def lambda_handler(event, context):
     """Receives S3 file upload event and starts processing the CSV file
@@ -236,7 +234,6 @@ def _post_users(user_chunks: List[List]) -> int:
     :return: Number of users successfully updated
     """
     updated = 0
-    # succeeded = skip_indexes or []
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
         try:
             results = executor.map(_post_to_braze, user_chunks)
@@ -245,17 +242,6 @@ def _post_users(user_chunks: List[List]) -> int:
         except APIRetryError:
             _delay()
             return _post_users(user_chunks)
-        # future_to_chunk_index = {executor.submit(
-        #     _post_to_braze, user_chunk): i for i, user_chunk in enumerate(user_chunks)}
-        #   for future in as_completed(future_to_chunk_index):
-        #        try:
-        #             processed_users = future.result()
-        #             updated += processed_users
-        #             succeeded.append(future_to_chunk_index[future])
-        #         except APIRetryError:
-        #             _delay()
-        #             return _post_users(user_chunks, succeeded)
-
     return updated
 
 
@@ -283,7 +269,7 @@ def _post_to_braze(users: List[Dict]) -> int:
 
 def _start_retry_session() -> requests.Session:
     session = requests.Session()
-    retry = Retry(total=3, backoff_factor=0.5)
+    retry = Retry(total=3, backoff_factor=2)
     adapter = HTTPAdapter(max_retries=retry)
     session.mount('https://', adapter)
     return session
@@ -332,7 +318,7 @@ def _handle_braze_response(response: requests.Response) -> int:
 
     if response.status_code > 400:
         raise FatalAPIError(res_text.get('message', response.text))
-    
+
     return 0
 
 
