@@ -257,8 +257,11 @@ def _post_to_braze(users: List[Dict]) -> int:
 
     :return: The number of users successfully imported
     """
-    headers = {"Content-Type": "application/json",
-               "Authorization": f"Bearer {BRAZE_API_KEY}", }
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {BRAZE_API_KEY}",
+        "X-Braze-Bulk": "true"
+    }
     data = json.dumps({"attributes": users})
     session = _start_retry_session()
     response = session.post(f"{BRAZE_API_URL}/users/track",
