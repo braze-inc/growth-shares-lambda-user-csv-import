@@ -70,7 +70,7 @@ To start processing your User Attribute CSV files, we need to deploy the Serverl
 - Role allowing for creation of the above
 - Policy to allow Lambda to receive S3 upload event in the new bucket
 
-Follow the direct link to the [Application](_TODO: Insert public link here_) or open the [AWS Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications) and search for _braze-user-attribute-import_. Note that you must check the `Show apps that create custom IAM roles and resource policies` checkbox in order to see this application. The application creates a policy for the lambda to read from the newly created S3 bucket.
+Follow the direct link to the [Application](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:585170621372:applications/braze-user-attribute-import) or open the [AWS Serverless Application Repository](https://serverlessrepo.aws.amazon.com/applications) and search for _braze-user-attribute-import_. Note that you must check the `Show apps that create custom IAM roles and resource policies` checkbox in order to see this application. The application creates a policy for the lambda to read from the newly created S3 bucket.
 
 Click **Deploy** and let AWS create all the necessary resources.
 
