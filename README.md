@@ -87,6 +87,7 @@ The following resources were created:
 To run the function, drop a user attribute CSV file in the newly created S3 bucket.
 
 <a name="monitoring"></a>
+
 #### Monitoring and Logging
 
 To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
@@ -116,24 +117,18 @@ _2048MB Lambda Function_
 
 <br>
 
-
-<!-- ## Manual Function Deploy
-
-1. Download the packaged code from [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases)
-2. Create a new Lambda function
-3. ... -->
-
 ## Fatal Error
 
 In case of an unexpected error that prevents further processing of the file, an event is logged (accessible through CloudWatch described in [Monitoring and Logging](#monitoring)) that can be used to restart the Lambda from the point where the program stopped processing the file. It is important not to re-import the same data to save Data Points. You can find the instructions how to do that below.
+
 ## Manual Triggers
 
 In case you wanted to trigger the Lambda manually, for testing or due to processing error, you can do it from the AWS Lambda Console using a test event.  
-Open the Braze User Import Lambda in the the AWS console by opening Lambda service and selecting `braze-user-csv-import` function. Navigate to **Test**. 
+Open the Braze User Import Lambda in the the AWS console by opening Lambda service and selecting `braze-user-csv-import` function. Navigate to **Test**.
 
 <img src="./img/lambda-console-test.png" width="500" style="border: 1px solid lightgray;">
 
-#### Event 
+#### Event
 
 If you have an event from a returned exception, paste it in the **Test event**. Otherwise, copy the contents of [`sample-event.json`](/events/sample-event.json). Replace the following values:
 
@@ -141,15 +136,52 @@ If you have an event from a returned exception, paste it in the **Test event**. 
 2. `"name"` and `"arn"` under `"bucket"`, replace **only** `lambda-bucket-name` with the bucket name that CSV files are read from (the bucket that triggers this Lambda)
 3. `"key"` under `"object"` with the CSV file key
 
-*Optional*:
+_Optional_:
+
 - `"offset"` field specifies the byte offset to start reading the file from
-- `"headers"` field specifies CSV headers and it is mandatory if the file is not being read from the beginning 
+- `"headers"` field specifies CSV headers and it is mandatory if the file is not being read from the beginning
 
 #### Invoke
 
 To invoke the function, press `Invoke` and wait for the execution to finish.
 
+## Manual Function Deploy
 
+<a name="role"></a>
+
+### Role
+
+The Lambda function requires permissions to read objects from S3, log to CloudWatch and call other Lambda functions. You can create a new role or add the policies to an existing roles.
+Required policies:
+
+    AmazonS3ReadOnlyAccess
+    AWSLambdaBasicExecutionROle
+    AWSLambdaRole
+
+To create a new role with these permissions open [Roles](https://console.aws.amazon.com/iam/home?region=us-east-1#/roles) console.
+
+1. Click **Create role**
+2. Select **Lambda** as a use case, and click on **Next: Permissions**
+3. Search and mark all policies mentioned above
+4. Click **Next:Tags** and **Next:Review**, name your role and finally create it by pressing **Create role**
+
+### Create Function
+
+1. Download the packaged code from [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases)
+2. Create a new [Lambda](https://console.aws.amazon.com/lambda/home?region=us-east-1#/discover) function.
+
+   1. Select _Author from scratch_
+   2. Name your function
+   3. Select **Python 3.6** runtime
+   4. Under **Change default execution role**, select _Use an existing role_ and select a role with all three policies described [above](#role)
+   5. Create the function
+
+3. Upload the packaged code downloaded from the repository by clicking on **Upload from** and selecting `.zip file`
+4. Configure Lambda
+   1. In the **Code** tab, scroll down to edit _Runtime settings_, changing Handler to `app.lambda_handler`
+   2. In the **Configuration** tab, edit _General configuration_, setting timeout to `15` min and `0` sec, and changing Memory size to `2048` MB
+   3. Also in **Configuration**, under _Environment variables_ add two key-value pairs: `BRAZE_API_URL` key with your API URL as value, and `BRAZE_API_KEY` with your API Key as value
+5. Add an S3 trigger where you can drop the user attribute CSV files by clicking on `+ Add trigger` under the Function overview, selecting **S3** as a trigger and the source bucket, optionally using a bucket prefix. Then Add the trigger.
 
 # Contributing and Testing
 
@@ -162,4 +194,3 @@ And run
     pytest
 
 Contributions are welcome.
-
