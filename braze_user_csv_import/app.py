@@ -23,7 +23,7 @@ import json
 from time import sleep
 from concurrent.futures.thread import ThreadPoolExecutor
 from concurrent.futures import as_completed
-from typing import Dict, Iterator, List
+from typing import Dict, Iterator, List, Optional, Sequence
 
 import requests
 import boto3
@@ -196,7 +196,7 @@ def _get_object_stream(object, offset: int):
     return object.get(Range=f"bytes={offset}-")["Body"]
 
 
-def _verify_header_format(columns: List[str]) -> None:
+def _verify_header_format(columns: Optional[Sequence[str]]) -> None:
     """Verifies that column follow the established format of
     `external_id,attr1,...attrN`
 
@@ -217,7 +217,7 @@ def _process_row(user_row: Dict) -> None:
     :param user_row: A single row from the CSV file in a dict form
     """
     for col, value in user_row.items():
-        if value[0] == '[' and value[-1] == ']':
+        if value and (value[0] == '[' and value[-1] == ']'):
             list_values = ast.literal_eval(value)
             list_values = [item.strip() for item in list_values]
             user_row[col] = list_values
