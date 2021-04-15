@@ -55,6 +55,8 @@ Resources:
       Handler: app.lambda_handler
       Runtime: python3.6
       MemorySize: 2048
+      EventInvokeConfig:
+        MaximumRetryAttempts: 0
       Environment:
         Variables:
           BRAZE_API_KEY: !Ref BrazeAPIKey
