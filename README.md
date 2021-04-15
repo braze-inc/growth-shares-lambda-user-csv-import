@@ -181,6 +181,7 @@ To create a new role with these permissions open [Roles](https://console.aws.ama
    1. In the **Code** tab, scroll down to edit _Runtime settings_, changing Handler to `app.lambda_handler`
    2. In the **Configuration** tab, edit _General configuration_, setting timeout to `15` min and `0` sec, and changing Memory size to `2048` MB
    3. Also in **Configuration**, under _Environment variables_ add two key-value pairs: `BRAZE_API_URL` key with your API URL as value, and `BRAZE_API_KEY` with your API Key as value
+   4. Under _Asynchronous invocation_, change `Retry attempts` to `0`.
 5. Add an S3 trigger where you can drop the user attribute CSV files by clicking on `+ Add trigger` under the Function overview, selecting **S3** as a trigger and the source bucket, optionally using a bucket prefix. Then Add the trigger.
 
 # Contributing and Testing
