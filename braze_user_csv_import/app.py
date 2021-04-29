@@ -148,11 +148,15 @@ class CsvProcessor:
         Yields each line separately.
         """
         object_stream = _get_object_stream(self.csv_file, self.total_offset)
-        leftover = b""
+        leftover = b''
         for chunk in object_stream.iter_chunks():
             data = leftover + chunk
-            last_newline = data.rfind(b"\n")
-            data, leftover = data[:last_newline], data[last_newline:]
+            if len(data) + self.total_offset < self.csv_file.content_length:
+                last_newline = data.rfind(b'\n')
+                data, leftover = data[:last_newline], data[last_newline:]
+            else:
+                leftover == b''
+
             for line in data.splitlines(keepends=True):
                 self.processing_offset += len(line)
                 yield line.decode("utf-8")
