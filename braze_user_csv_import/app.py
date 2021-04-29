@@ -28,6 +28,7 @@ from typing import Dict, Iterator, List, Optional, Sequence
 import requests
 import boto3
 from urllib3.util.retry import Retry
+from urllib.parse import unquote_plus
 from requests.adapters import HTTPAdapter
 
 # 10 minute function timeout
@@ -58,7 +59,7 @@ def lambda_handler(event, context):
     """
     print("New CSV to Braze import process started")
     bucket_name = event['Records'][0]['s3']['bucket']['name']
-    object_key = event['Records'][0]['s3']['object']['key']
+    object_key = unquote_plus(event['Records'][0]['s3']['object']['key'])
 
     print(f"Processing {bucket_name}/{object_key}")
     csv_processor = CsvProcessor(bucket_name, object_key,
