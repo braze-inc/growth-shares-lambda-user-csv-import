@@ -107,6 +107,11 @@ You can reduce or increase the amount of available memory for the function in th
 
 Keep in mind that any more memory above 2GB has diminishing returns where it might improve processing speed by 10-20% but at the same time doubling or tripling the cost.
 
+
+#### Updating an Existing Function
+
+If you have already deployed the application and a new version is available in the repository, you can update by re-deploying the function as if you were doing it for the first time. That means you have to pass it the Braze API Key and Braze API URL again. The update will only overwrite the function code. It will not modify or delete other existing resources like the S3 bucket.
+
 <a name="execution-times"></a>
 
 ## Estimated Execution Times
