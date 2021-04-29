@@ -148,9 +148,10 @@ class CsvProcessor:
         Reads chunks of data (1,024 bytes) by default, and splits it into lines.
         Yields each line separately.
         """
+        chunk_size = 1024*1024*10
         object_stream = _get_object_stream(self.csv_file, self.total_offset)
         leftover = b''
-        for chunk in object_stream.iter_chunks():
+        for chunk in object_stream.iter_chunks(chunk_size=chunk_size):
             data = leftover + chunk
             if len(data) + self.total_offset < self.csv_file.content_length:
                 last_newline = data.rfind(b'\n')
