@@ -39,9 +39,6 @@ For example, if your dashboard shows `dashboard-01.braze.com/` URL, your REST en
 
 You can also find your REST API URL in the dashboard. In then the left navigation panel, scroll down and select **Manage App Group**.
 
-<img src="./img/manage-app-group.png" width="200" style="border: 1px solid lightgray;">
-
- <!-- <img src="https://github.com/braze-inc/growth-shares-lambda-user-csv-import/blob/master/img/create-bucket.png"> -->
 
 There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `rest.iad-01.braze.com`
 
@@ -49,11 +46,8 @@ There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your R
 
 To connect with Braze servers, we also need an API key. This unique identifier allows Braze to verify your identity and upload your data. To get your API key, open the Dashboard and scroll down the left navigation section. Select **Developer Console** under _App Settings_.
 
-<img src="./img/developer-console.png" width="200" style="border: 1px solid lightgray;">
-
 You will need an API key that has a permission to post to `user.track` API endpoint. If you know one of your API keys supports that endpoint, you can use that key. To create a new one, click on `Create New API Key` on the right side of your screen.
 
-<img src="./img/create-key.png" width="200" style="border: 1px solid lightgray;">
 
 Next, name your API Key and select `users.track` under the _User Data_ endpoints group. Scroll down and click on **Save API Key**.
 We will need this key shortly.
@@ -136,7 +130,6 @@ In case of an unexpected error that prevents further processing of the file, an 
 In case you wanted to trigger the Lambda manually, for testing or due to processing error, you can do it from the AWS Lambda Console using a test event.  
 Open the Braze User Import Lambda in the the AWS console by opening Lambda service and selecting `braze-user-csv-import` function. Navigate to **Test**.
 
-<img src="./img/lambda-console-test.png" width="500" style="border: 1px solid lightgray;">
 
 #### Event
 
