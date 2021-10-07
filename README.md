@@ -40,7 +40,7 @@ For example, if your dashboard shows `dashboard-01.braze.com/` URL, your REST en
 You can also find your REST API URL in the dashboard. In then the left navigation panel, scroll down and select **Manage App Group**.
 
 
-There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `rest.iad-01.braze.com`
+There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `https://rest.iad-01.braze.com`
 
 #### API Key
 
