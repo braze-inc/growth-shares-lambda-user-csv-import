@@ -62,7 +62,7 @@ def lambda_handler(event, context):
 
     print(f"Processing {bucket_name}/{object_key}")
     csv_processor = CsvProcessor(
-        bucket_name, 
+        bucket_name,
         object_key,
         event.get("offset", 0),
         event.get("headers", None)
@@ -72,7 +72,7 @@ def lambda_handler(event, context):
         csv_processor.process_file(context)
     except Exception as e:
         event = _create_event(
-            event, 
+            event,
             csv_processor.total_offset,
             csv_processor.headers
         )
@@ -84,7 +84,7 @@ def lambda_handler(event, context):
         _start_next_process(
             context.function_name,
             event,
-            csv_processor.total_offset, 
+            csv_processor.total_offset,
             csv_processor.headers
         )
 
@@ -106,10 +106,10 @@ class CsvProcessor:
     """
 
     def __init__(
-        self, 
-        bucket_name: str, 
+        self,
+        bucket_name: str,
         object_key: str,
-        offset: int = 0, 
+        offset: int = 0,
         headers: List[str] = None
     ) -> None:
         self.processing_offset = 0
@@ -290,9 +290,7 @@ def _post_to_braze(users: List[Dict]) -> int:
         "Authorization": f"Bearer {BRAZE_API_KEY}",
         "X-Braze-Bulk": "true"
     }
-    print(users)
     data = json.dumps({"attributes": users})
-    print(data)
     session = _start_retry_session()
     response = session.post(f"{BRAZE_API_URL}/users/track",
                             headers=headers, data=data)
