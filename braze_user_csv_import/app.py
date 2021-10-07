@@ -7,11 +7,11 @@ The expected CSV format is:
 of the user to be updated and every column afterwards specifies an attribute
 to update.
 
-The lambda will run up for to 12 minutes. If the file is not processed until
+The lambda will run up for to 10 minutes. If the file is not processed until
 then, it will automatically deploy another lambda to continue processing
 the file from where it left off.
 
-The CSV file is streamed by 1024 byte chunks. User updates are posted to Braze
+The CSV file is streamed by 10MB chunks. User updates are posted to Braze
 platform as the processing goes on, in 75 user chunks which is the maximum
 amount of users supported by the Braze API.
 """
@@ -22,7 +22,6 @@ import ast
 import json
 from time import sleep
 from concurrent.futures.thread import ThreadPoolExecutor
-from concurrent.futures import as_completed
 from typing import Dict, Iterator, List, Optional, Sequence
 
 import requests
@@ -62,22 +61,32 @@ def lambda_handler(event, context):
     object_key = unquote_plus(event['Records'][0]['s3']['object']['key'])
 
     print(f"Processing {bucket_name}/{object_key}")
-    csv_processor = CsvProcessor(bucket_name, object_key,
-                                 event.get("offset", 0),
-                                 event.get("headers", None))
+    csv_processor = CsvProcessor(
+        bucket_name, 
+        object_key,
+        event.get("offset", 0),
+        event.get("headers", None)
+    )
 
     try:
         csv_processor.process_file(context)
     except Exception as e:
-        event = _create_event(event, csv_processor.total_offset,
-                              csv_processor.headers)
+        event = _create_event(
+            event, 
+            csv_processor.total_offset,
+            csv_processor.headers
+        )
         _handle_fatal_error(str(e), csv_processor.processed_users, event)
         raise 
 
     print(f"Processed {csv_processor.processed_users:,} users.")
     if not csv_processor.is_finished():
-        _start_next_process(context.function_name, event,
-                            csv_processor.total_offset, csv_processor.headers)
+        _start_next_process(
+            context.function_name,
+            event,
+            csv_processor.total_offset, 
+            csv_processor.headers
+        )
 
     return {
         "users_processed": csv_processor.processed_users,
@@ -96,8 +105,13 @@ class CsvProcessor:
     :param headers: CSV file headers
     """
 
-    def __init__(self, bucket_name: str, object_key: str,
-                 offset: int = 0, headers: List[str] = None) -> None:
+    def __init__(
+        self, 
+        bucket_name: str, 
+        object_key: str,
+        offset: int = 0, 
+        headers: List[str] = None
+    ) -> None:
         self.processing_offset = 0
         self.total_offset = offset
         self.csv_file = _get_file_from_s3(bucket_name, object_key)
@@ -123,8 +137,8 @@ class CsvProcessor:
 
         user_rows, user_row_chunks = [], []
         for row in reader:
-            _process_row(row)
-            user_rows.append(row)
+            processed_row = _process_row(row)
+            user_rows.append(processed_row)
             if len(user_rows) == 75:
                 user_row_chunks.append(user_rows)
                 user_rows = []
@@ -186,7 +200,7 @@ class CsvProcessor:
 
 
 def _get_file_from_s3(bucket_name: str, object_key: str):
-    """Return the S3 Object with `object_key` name, from `bucket_name` S3
+    """Returns the S3 Object with `object_key` name, from `bucket_name` S3
     bucket."""
     return boto3.resource("s3").Object(bucket_name, object_key)
 
@@ -210,10 +224,10 @@ def _verify_header_format(columns: Optional[Sequence[str]]) -> None:
     :raises ValueError: if the format didn't meet the requirements
     """
     if columns and columns[0] != 'external_id':
-        raise ValueError("File headers don't match the expected format.")
+        raise ValueError("File headers don't match the expected format. First column should specify a user's 'external_id'.")
 
 
-def _process_row(user_row: Dict) -> None:
+def _process_row(user_row: Dict) -> Dict:
     """Processes a CSV row.
 
     If values in a column are formatted as a list of values, for example
@@ -222,11 +236,19 @@ def _process_row(user_row: Dict) -> None:
 
     :param user_row: A single row from the CSV file in a dict form
     """
+    processed_row = {}
     for col, value in user_row.items():
-        if value and (value[0] == '[' and value[-1] == ']'):
+        if value == '':
+            continue
+        elif value == 'null':
+            processed_row[col] = None
+        elif len(value) > 1 and value[0] == '[' and value[-1] == ']':
             list_values = ast.literal_eval(value)
             list_values = [item.strip() for item in list_values]
-            user_row[col] = list_values
+            processed_row[col] = list_values
+        else:
+            processed_row[col] = value
+    return processed_row
 
 
 def _post_users(user_chunks: List[List]) -> int:
@@ -268,7 +290,9 @@ def _post_to_braze(users: List[Dict]) -> int:
         "Authorization": f"Bearer {BRAZE_API_KEY}",
         "X-Braze-Bulk": "true"
     }
+    print(users)
     data = json.dumps({"attributes": users})
+    print(data)
     session = _start_retry_session()
     response = session.post(f"{BRAZE_API_URL}/users/track",
                             headers=headers, data=data)
@@ -332,7 +356,7 @@ def _handle_braze_response(response: requests.Response) -> int:
 
 
 def _start_next_process(function_name: str, event: Dict, offset: int,
-                        headers: List[str]) -> None:
+                        headers: Optional[Sequence[str]]) -> None:
     """Starts a new lambda process, passing in current offset in the file.
 
     :param function_name: Python function name for Lambda to invoke
@@ -350,7 +374,7 @@ def _start_next_process(function_name: str, event: Dict, offset: int,
 
 
 def _create_event(received_event: Dict, byte_offset: int,
-                  headers: List[str]) -> Dict:
+                  headers: Optional[Sequence[str]]) -> Dict:
     return {
         **received_event,
         "offset": byte_offset,
@@ -359,13 +383,13 @@ def _create_event(received_event: Dict, byte_offset: int,
 
 
 def _should_terminate(context) -> bool:
-    """Return whether lambda should terminate execution."""
+    """Returns whether lambda should terminate execution."""
     # print(f"Remaining time: {(context.get_remaining_time_in_millis() / 1000 / 60):.2f} min")
     return context.get_remaining_time_in_millis() < FUNCTION_TIME_OUT
 
 
 def _delay():
-    """Increase the number of retries and stall the execution."""
+    """Increases the number of retries and stall the execution."""
     global RETRIES
     RETRIES += 1
     sleep(2**RETRIES)

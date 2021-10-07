@@ -1,5 +1,7 @@
 # User Attribute CSV to Braze Ingestion
 
+### [Deploy Application](https://console.aws.amazon.com/lambda/home?region=us-east-1#/create/app?applicationId=arn:aws:serverlessrepo:us-east-1:585170621372:applications/braze-user-attribute-import)
+
 This serverless application allows you to easily deploy a Lambda process that will post user attribute data from a CSV file directly to Braze using Braze Rest API endpoint [User Track](https://www.braze.com/docs/api/endpoints/user_data/post_user_track/). The process launches immediately when you upload a CSV file to the configured AWS S3 bucket.  
 It can handle large files and uploads. However, it is important to keep in mind that due to Lambda's time limits, the function will stop execution after 10 minutes. The process will launch another Lambda instance to finish processing the remaining of the file. For more details about function timing, checkout [Execution Times](#execution-times).
 
@@ -17,9 +19,24 @@ CSV file example:
     abc123,1982,Solomon
     def456,578,Hunter-Hayes
 
-### CSV Processing
+### CSV File Processing
 
-Any values in an array (ex. `"['Value1', 'Value2']"` will be automatically destructured and sent to the API in an array rather than a string representation of an array.
+#### Empty Values
+
+Any empty values will be ignored. That will help you save on data points when updating custom attributes.
+
+#### Array Attributes
+
+Any values in an array will be automatically destructured and sent to the API in an array rather than a string representation of an array. For example, value `"['Value1', 'Value2']"` will be sent to Braze as array attribute `['Value1', 'Value2']`.
+
+#### Unsetting Attributes
+
+To unset, or remove, an attribute, you can use a special string value `null`. For example, the following row will remove the `CustomAttribute` from `user123`:
+
+```
+external_id,CustomAttribute
+user123,null
+```
 
 ## Requirements
 
@@ -47,7 +64,6 @@ There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your R
 To connect with Braze servers, we also need an API key. This unique identifier allows Braze to verify your identity and upload your data. To get your API key, open the Dashboard and scroll down the left navigation section. Select **Developer Console** under _App Settings_.
 
 You will need an API key that has a permission to post to `user.track` API endpoint. If you know one of your API keys supports that endpoint, you can use that key. To create a new one, click on `Create New API Key` on the right side of your screen.
-
 
 Next, name your API Key and select `users.track` under the _User Data_ endpoints group. Scroll down and click on **Save API Key**.
 We will need this key shortly.
@@ -101,7 +117,6 @@ You can reduce or increase the amount of available memory for the function in th
 
 Keep in mind that any more memory above 2GB has diminishing returns where it might improve processing speed by 10-20% but at the same time doubling or tripling the cost.
 
-
 #### Updating an Existing Function
 
 If you have already deployed the application and a new version is available in the repository, you can update by re-deploying the function as if you were doing it for the first time. That means you have to pass it the Braze API Key and Braze API URL again. The update will only overwrite the function code. It will not modify or delete other existing resources like the S3 bucket.
@@ -129,7 +144,6 @@ In case of an unexpected error that prevents further processing of the file, an 
 
 In case you wanted to trigger the Lambda manually, for testing or due to processing error, you can do it from the AWS Lambda Console using a test event.  
 Open the Braze User Import Lambda in the the AWS console by opening Lambda service and selecting `braze-user-csv-import` function. Navigate to **Test**.
-
 
 #### Event
 

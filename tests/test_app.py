@@ -1,5 +1,4 @@
 import json
-
 import pytest
 
 from braze_user_csv_import import app
@@ -11,22 +10,17 @@ def test_lambda_handler_fails_assert_event_logged(mocker, capsys):
     event = {"Records": [
         {"s3": {"bucket": {"name": "test"}, "object": {"key": "test"}}}]}
 
-    # Mock CsvProcessor
     mock_processor = mocker.MagicMock(headers=headers, total_offset=offset,
                                       processed_users=999)
     # Set off fatal exception during file processing
     mock_processor.process_file.side_effect = app.FatalAPIError("Test error")
-
-    # Apply the mock
     mock_processor = mocker.patch('braze_user_csv_import.app.CsvProcessor',
                                   return_value=mock_processor)
-
-    # Expect a fatal exception
     with pytest.raises(Exception):
         app.lambda_handler(event, None)
 
     # Confirm that event gets logged
-    logs, err = capsys.readouterr()
+    logs, _ = capsys.readouterr()
     new_event = json.dumps({**event, "offset": offset, "headers": headers})
     assert 'Encountered error "Test error"' in logs
     assert f"{new_event}" in logs
@@ -52,10 +46,6 @@ def test_failed_import_offset_does_not_progress(mocker, users, csv_processor):
     with pytest.raises(RuntimeError):
         csv_processor.post_users(chunks)
     assert csv_processor.total_offset == 0
-
-
-def test_posting_users_fails_some_users_assert_calls_not_repeated(mocker):
-    pass
 
 
 def test__handle_braze_response_success(mocker, users):
@@ -92,3 +82,24 @@ def test__handle_braze_response_server_error_max_retries_raises_fatal_api_error(
 
     with pytest.raises(app.FatalAPIError):
         app._handle_braze_response(res)
+
+
+def test__process_row_empty_string_should_ignore():
+    row = {'external_id': 'user1', 'attribute1': '', 'attribute2': 'value'}
+    processed_row = app._process_row(row)
+    assert len(processed_row) == 2
+    assert 'attribute1' not in processed_row
+
+
+def test__process_row_null_string_should_convert_to_none():
+    row = {'external_id': 'user1', 'attribute1': 'null'}
+    processed_row = app._process_row(row)
+    assert len(processed_row) == 2
+    assert processed_row['attribute1'] == None
+
+
+def test__process_list_string_should_deconstruct():
+    row = {'external_id': 'user1', 'attribute1': "['value1', 'value2']"}
+    processed_row = app._process_row(row)
+    assert len(processed_row) == 2
+    assert isinstance(processed_row['attribute1'], list)
