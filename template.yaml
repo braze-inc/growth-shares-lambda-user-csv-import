@@ -53,7 +53,7 @@ Resources:
       FunctionName: braze-user-csv-import
       CodeUri: braze_user_csv_import/
       Handler: app.lambda_handler
-      Runtime: python3.6
+      Runtime: python3.7
       MemorySize: 2048
       EventInvokeConfig:
         MaximumRetryAttempts: 0
