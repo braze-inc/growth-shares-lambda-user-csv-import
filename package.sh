@@ -7,7 +7,7 @@ if [ -d "./build" ]
 then 
     echo "Build directory exists, skipping"
 else
-    mkdir test
+    mkdir build
 fi
 
 echo "Packaging depencies"
