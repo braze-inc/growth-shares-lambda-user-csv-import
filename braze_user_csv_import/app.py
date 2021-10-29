@@ -122,7 +122,7 @@ class CsvProcessor:
     def process_file(self, context) -> None:
         """Processes the CSV file.
 
-        It reads the file by 1,024 byte chunks and iterates over each line.
+        It reads the file by 10MB chunks and iterates over each line.
         It collects users into 75-user chunks which is the maximum amount
         of users Braze API accepts. Once there are enough chunks collected,
         it uploads them concurrently from background threads.
@@ -159,7 +159,7 @@ class CsvProcessor:
     def iter_lines(self) -> Iterator:
         """Iterates over lines in the object.
 
-        Reads chunks of data (1,024 bytes) by default, and splits it into lines.
+        Reads chunks of data (10MB) by default, and splits it into lines.
         Yields each line separately.
         """
         chunk_size = 1024*1024*10
@@ -191,8 +191,8 @@ class CsvProcessor:
         self._move_offset()
 
     def is_finished(self) -> bool:
-        """Returns whether the end of file was reached."""
-        return self.total_offset >= self.csv_file.content_length
+        """Returns whether the end of file was reached or there were no rows in the file."""
+        return not self.total_offset or self.total_offset >= self.csv_file.content_length
 
     def _move_offset(self) -> None:
         self.total_offset += self.processing_offset
