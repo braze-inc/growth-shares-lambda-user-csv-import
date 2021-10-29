@@ -121,6 +121,8 @@ Keep in mind that any more memory above 2GB has diminishing returns where it mig
 
 If you have already deployed the application and a new version is available in the repository, you can update by re-deploying the function as if you were doing it for the first time. That means you have to pass it the Braze API Key and Braze API URL again. The update will only overwrite the function code. It will not modify or delete other existing resources like the S3 bucket.
 
+You can also upload the packaged `.zip` file that's available under [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases). In the AWS Console, navigate to the `braze-user-csv-import` Lambda function and in the **Code** tab, click on **Upload from** and then **.zip file**. Select the downladed `.zip` file.
+
 <a name="execution-times"></a>
 
 ## Estimated Execution Times
