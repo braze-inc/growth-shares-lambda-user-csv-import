@@ -138,6 +138,9 @@ class CsvProcessor:
         user_rows, user_row_chunks = [], []
         for row in reader:
             processed_row = _process_row(row)
+            if len(processed_row) <= 1:
+                continue
+
             user_rows.append(processed_row)
             if len(user_rows) == 75:
                 user_row_chunks.append(user_rows)
@@ -238,7 +241,7 @@ def _process_row(user_row: Dict) -> Dict:
     """
     processed_row = {}
     for col, value in user_row.items():
-        if value == '':
+        if value.strip() == '':
             continue
         elif value == 'null':
             processed_row[col] = None
