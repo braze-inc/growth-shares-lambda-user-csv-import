@@ -20,15 +20,14 @@ import csv
 import os
 import ast
 import json
-from time import sleep
 from concurrent.futures.thread import ThreadPoolExecutor
 from typing import Dict, Iterator, List, Optional, Sequence
 
 import requests
 import boto3
-from urllib3.util.retry import Retry
 from urllib.parse import unquote_plus
-from requests.adapters import HTTPAdapter
+from requests.exceptions import RequestException
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # 10 minute function timeout
 FUNCTION_RUN_TIME = 10 * 60 * 1_000
@@ -37,9 +36,7 @@ FUNCTION_RUN_TIME = 10 * 60 * 1_000
 # 15 minutes which is the maximum lambda execution time
 FUNCTION_TIME_OUT = 900_000 - FUNCTION_RUN_TIME
 MAX_THREADS = 20
-
-MAX_API_RETRIES = 6
-RETRIES = 0
+MAX_RETRIES = 5
 
 BRAZE_API_URL = os.environ['BRAZE_API_URL']
 BRAZE_API_KEY = os.environ['BRAZE_API_KEY']
@@ -227,7 +224,8 @@ def _verify_header_format(columns: Optional[Sequence[str]]) -> None:
     :raises ValueError: if the format didn't meet the requirements
     """
     if columns and columns[0] != 'external_id':
-        raise ValueError("File headers don't match the expected format. First column should specify a user's 'external_id'.")
+        raise ValueError(
+            "File headers don't match the expected format. First column should specify a user's 'external_id'.")
 
 
 def _process_row(user_row: Dict) -> Dict:
@@ -266,16 +264,15 @@ def _post_users(user_chunks: List[List]) -> int:
     """
     updated = 0
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-        try:
-            results = executor.map(_post_to_braze, user_chunks)
-            for result in results:
-                updated += result
-        except APIRetryError:
-            _delay()
-            return _post_users(user_chunks)
+        results = executor.map(_post_to_braze, user_chunks)
+        for result in results:
+            updated += result
     return updated
 
 
+@retry(retry=retry_if_exception_type(RequestException),
+       wait=wait_exponential(multiplier=8, min=8, max=120),
+       stop=stop_after_attempt(MAX_RETRIES))
 def _post_to_braze(users: List[Dict]) -> int:
     """Posts users read from the CSV file to Braze users/track API endpoint.
 
@@ -294,19 +291,10 @@ def _post_to_braze(users: List[Dict]) -> int:
         "X-Braze-Bulk": "true"
     }
     data = json.dumps({"attributes": users})
-    session = _start_retry_session()
-    response = session.post(f"{BRAZE_API_URL}/users/track",
-                            headers=headers, data=data)
+    response = requests.post(f"{BRAZE_API_URL}/users/track",
+                             headers=headers, data=data)
     error_users = _handle_braze_response(response)
     return len(users) - error_users
-
-
-def _start_retry_session() -> requests.Session:
-    session = requests.Session()
-    retry = Retry(total=3, backoff_factor=2)
-    adapter = HTTPAdapter(max_retries=retry)
-    session.mount('https://', adapter)
-    return session
 
 
 def _handle_braze_response(response: requests.Response) -> int:
@@ -343,12 +331,8 @@ def _handle_braze_response(response: requests.Response) -> int:
         return 0
 
     server_error = response.status_code == 429 or response.status_code >= 500
-    should_retry = server_error and RETRIES < MAX_API_RETRIES
-    if server_error and not should_retry:
-        raise FatalAPIError("Too many requests.")
-
     if server_error:
-        raise APIRetryError
+        raise APIRetryError("Server error. Retrying..")
 
     if response.status_code > 400:
         raise FatalAPIError(res_text.get('message', response.text))
@@ -385,15 +369,7 @@ def _create_event(received_event: Dict, byte_offset: int,
 
 def _should_terminate(context) -> bool:
     """Returns whether lambda should terminate execution."""
-    # print(f"Remaining time: {(context.get_remaining_time_in_millis() / 1000 / 60):.2f} min")
     return context.get_remaining_time_in_millis() < FUNCTION_TIME_OUT
-
-
-def _delay():
-    """Increases the number of retries and stall the execution."""
-    global RETRIES
-    RETRIES += 1
-    sleep(2**RETRIES)
 
 
 def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -> None:
@@ -404,9 +380,9 @@ def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -
     print(json.dumps(event))
 
 
-class APIRetryError(Exception):
+class APIRetryError(RequestException):
     """Raised on 429 or 5xx server exception. If there are retries left, the
-    API call will be made again after delay."""
+    API call will be made again after a delay."""
     pass
 
 
