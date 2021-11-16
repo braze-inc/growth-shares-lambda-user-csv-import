@@ -1,5 +1,5 @@
 #!/bin/sh
-version="0.1.3.2"
+version="0.1.4"
 
 echo "Creating build directory"
 
@@ -12,7 +12,7 @@ fi
 
 echo "Packaging depencies"
 cd braze_user_csv_import
-pip install --target ./package requests
+pip install --target ./package requests tenacity
 echo "Packaging the app"
 cd package
 zip -r ../braze-lambda-user-csv-import-v"$version".zip .
