@@ -74,7 +74,7 @@ def lambda_handler(event, context):
             csv_processor.headers
         )
         _handle_fatal_error(str(e), csv_processor.processed_users, event)
-        raise 
+        raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
     if not csv_processor.is_finished():
@@ -152,7 +152,7 @@ class CsvProcessor:
         else:  # no break
             if user_rows:
                 user_row_chunks.append(user_rows)
-                self.post_users(user_row_chunks)
+            self.post_users(user_row_chunks)
 
         self.headers = reader.fieldnames or self.headers
 

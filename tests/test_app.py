@@ -63,6 +63,12 @@ def test__process_row_null_string_should_convert_to_none():
     assert processed_row['attribute1'] == None
 
 
+def test__process_row_single_digit_value():
+    row = {'external_id': '0166ecc9-asd9-0305-sjn9-efd44fe61b96', 'attribute': '0'}
+    processed_row = app._process_row(row)
+    assert len(processed_row) > 1
+
+
 def test__process_list_string_should_deconstruct():
     row = {'external_id': 'user1', 'attribute1': "['value1', 'value2']"}
     processed_row = app._process_row(row)
