@@ -1,5 +1,5 @@
 #!/bin/sh
-version="0.1.4"
+version="0.1.5"
 
 echo "Creating build directory"
 
