@@ -245,7 +245,6 @@ def _process_row(user_row: Dict) -> Dict:
             processed_row[col] = None
         elif len(value) > 1 and value[0] == '[' and value[-1] == ']':
             list_values = ast.literal_eval(value)
-            list_values = [item.strip() for item in list_values]
             processed_row[col] = list_values
         else:
             processed_row[col] = value
