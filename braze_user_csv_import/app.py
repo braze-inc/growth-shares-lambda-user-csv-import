@@ -293,7 +293,6 @@ def _process_value(
         return False
     elif len(stripped) > 1 and stripped[0] == '[' and stripped[-1] == ']':
         list_values = ast.literal_eval(stripped)
-        list_values = [item for item in list_values]
         return list_values
     else:
         return value
