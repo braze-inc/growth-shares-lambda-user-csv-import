@@ -69,6 +69,57 @@ def test__process_row_single_digit_value():
     assert len(processed_row) > 1
 
 
+def test__process_value_int():
+    assert 90 == app._process_value("90")
+    assert 0 == app._process_value("0")
+    assert -5 == app._process_value("-5")
+
+
+def test__process_value_float():
+    assert 0.98 == app._process_value("0.98")
+    assert -4.23 == app._process_value("-4.23")
+
+
+def test__process_value_leading_zero_int():
+    assert "0123" == app._process_value("0123")
+
+
+def test__process_value_boolean():
+    assert True == app._process_value("True")
+    assert True == app._process_value("TRUE")
+    assert False == app._process_value("false")
+
+
+def test__process_value_array_of_numbers():
+    assert [9.12, 1, 4] == app._process_value("[9.12, 1, 4]")
+
+
+def test__process_value_array_of_strings():
+    assert ["a", "b", "c"] == app._process_value("['a', 'b', 'c']")
+
+
+def test__process_value_force_cast_to_int():
+    assert 4 == app._process_value("4.23", int)
+    assert 0 == app._process_value("00", int)
+
+
+def test__process_value_force_cast_to_str():
+    assert '2398' == app._process_value("2398", str)
+    assert '4.123' == app._process_value("4.123", str)
+    assert 'TRUE' == app._process_value("TRUE", str)
+
+
+def test__process_value_force_cast_to_bool():
+    assert False == app._process_value("False", bool)
+    assert True == app._process_value("1", bool)
+    assert False == app._process_value("0", bool)
+
+
+def test__is_int():
+    assert app._is_int("3")
+    assert not app._is_int("4.23")
+
+
 def test__process_list_string_should_deconstruct():
     row = {"external_id": "user1", "attribute1": "['value1', 'value2']"}
     processed_row = app._process_row(row, {})
@@ -138,3 +189,22 @@ def test__handle_braze_response_authorization_failure_raises_fatal_error(mocker)
 
     with pytest.raises(app.FatalAPIError):
         app._handle_braze_response(res)
+
+
+def test__process_type_cast_empty_string():
+    assert not app._process_type_cast('')
+
+
+def test_process_type_cast():
+    cast = app._process_type_cast(
+        'attr=string,numerical=integer, floaty=float')
+    assert cast
+    assert len(cast) == 3
+    assert cast['attr'] == str
+    assert cast['numerical'] == int
+    assert cast['floaty'] == float
+
+
+def test__process_type_cast_type_not_supported():
+    cast = app._process_type_cast('attr=floaty')
+    assert not cast

@@ -21,7 +21,7 @@ import os
 import ast
 import json
 from concurrent.futures.thread import ThreadPoolExecutor
-from typing import Dict, Iterator, List, Optional, Sequence
+from typing import Dict, Iterator, List, Optional, Sequence, Type, Union
 
 import requests
 import boto3
@@ -45,6 +45,8 @@ BRAZE_API_KEY = os.environ['BRAZE_API_KEY']
 if BRAZE_API_URL[-1] == '/':
     BRAZE_API_URL = BRAZE_API_URL[:-1]
 
+TypeMap = Dict[str, Type]
+
 
 def lambda_handler(event, context):
     """Receives S3 file upload event and starts processing the CSV file
@@ -57,13 +59,15 @@ def lambda_handler(event, context):
     print("New CSV to Braze import process started")
     bucket_name = event['Records'][0]['s3']['bucket']['name']
     object_key = unquote_plus(event['Records'][0]['s3']['object']['key'])
+    type_cast = _process_type_cast(os.environ.get('TYPE_CAST'))
 
     print(f"Processing {bucket_name}/{object_key}")
     csv_processor = CsvProcessor(
         bucket_name,
         object_key,
         event.get("offset", 0),
-        event.get("headers", None)
+        event.get("headers", None),
+        type_cast
     )
 
     try:
@@ -108,12 +112,14 @@ class CsvProcessor:
         bucket_name: str,
         object_key: str,
         offset: int = 0,
-        headers: List[str] = None
+        headers: List[str] = None,
+        type_cast: TypeMap = None
     ) -> None:
         self.processing_offset = 0
         self.total_offset = offset
         self.csv_file = _get_file_from_s3(bucket_name, object_key)
         self.headers = headers
+        self.type_cast = type_cast or {}
 
         self.processed_users = 0
 
@@ -131,11 +137,11 @@ class CsvProcessor:
                         function and runtime environment
         """
         reader = csv.DictReader(self.iter_lines(), fieldnames=self.headers)
-        _verify_header_format(reader.fieldnames)
+        _verify_headers(reader.fieldnames, self.type_cast)
 
         user_rows, user_row_chunks = [], []
         for row in reader:
-            processed_row = _process_row(row)
+            processed_row = _process_row(row, self.type_cast)
             if len(processed_row) <= 1:
                 continue
 
@@ -206,7 +212,7 @@ def _get_file_from_s3(bucket_name: str, object_key: str):
     return boto3.resource("s3").Object(bucket_name, object_key)  # type: ignore
 
 
-def _get_object_stream(object, offset: int):
+def _get_object_stream(s3_object, offset: int):
     """Returns an object stream from the S3 file, starting at the specified
     offset.
 
@@ -214,27 +220,32 @@ def _get_object_stream(object, offset: int):
     :param offset: Byte file offset
     :return: Stream of the S3 object, starting from ``offset``.
     """
-    return object.get(Range=f"bytes={offset}-")["Body"]
+    return s3_object.get(Range=f"bytes={offset}-")["Body"]
 
 
-def _verify_header_format(columns: Optional[Sequence[str]]) -> None:
+def _verify_headers(columns: Optional[Sequence[str]], type_cast: TypeMap) -> None:
     """Verifies that column follow the established format of
     `external_id,attr1,...attrN`
 
     :param columns: CSV file header columns
     :raises ValueError: if the format didn't meet the requirements
     """
-    if columns and columns[0] != 'external_id':
+    if not columns:
+        return
+
+    if columns[0] != 'external_id':
         raise ValueError(
-            "File headers don't match the expected format. First column should specify a user's 'external_id'.")
+            "File headers don't match the expected format."
+            "First column should specify a user's 'external_id'.")
+
+    for column_name in type_cast:
+        if column_name not in columns:
+            print(f"Warning: Cast column {column_name} not found."
+                  "Cast will not be applied.")
 
 
-def _process_row(user_row: Dict) -> Dict:
-    """Processes a CSV row.
-
-    If values in a column are formatted as a list of values, for example
-    "['Value1', 'Value2']" -- it converts them to a Python list in order
-    for Braze API to receive the data as an array rather than a string.
+def _process_row(user_row: Dict, type_cast: TypeMap) -> Dict:
+    """Processes a CSV row, evaluating each value type in the row.
 
     :param user_row: A single row from the CSV file in a dict form
     """
@@ -242,14 +253,50 @@ def _process_row(user_row: Dict) -> Dict:
     for col, value in user_row.items():
         if value.strip() == '':
             continue
-        elif value == 'null':
-            processed_row[col] = None
-        elif len(value) > 1 and value[0] == '[' and value[-1] == ']':
-            list_values = ast.literal_eval(value)
-            processed_row[col] = list_values
-        else:
-            processed_row[col] = value
+        processed_row[col] = _process_value(value, type_cast.get(col))
     return processed_row
+
+
+def _process_value(
+    value: str,
+    cast: Type = None
+) -> Union[None, str, int, float, list, bool]:
+    """Processes a single cell value.
+
+    If there is a forced type cast, returns the type casted value.
+    Otherwise, checks the format of the value and returns a correct value type.
+    If values in a column are formatted as a list of values, for example
+    "['Value1', 'Value2']" -- it converts them to an array.
+
+    :param value: Value in the cell
+    :param cast (optional): Forced variable type cast
+    :returns: Value of the proper type
+    """
+    if cast == str:
+        return value
+
+    stripped = value.strip().lower()
+    leading_zero_int = len(stripped) > 1 and stripped.startswith('0') \
+        and not stripped.startswith('0.')
+    if cast:
+        return cast(_process_value(value))
+
+    if stripped == 'null':
+        return None
+    elif not leading_zero_int and _is_int(value):
+        return int(stripped)
+    elif not leading_zero_int and _is_float(stripped):
+        return float(stripped)
+    elif stripped == 'true':
+        return True
+    elif stripped == 'false':
+        return False
+    elif len(stripped) > 1 and stripped[0] == '[' and stripped[-1] == ']':
+        list_values = ast.literal_eval(stripped)
+        list_values = [item for item in list_values]
+        return list_values
+    else:
+        return value
 
 
 def _post_users(user_chunks: List[List]) -> int:
@@ -298,9 +345,9 @@ def _post_to_braze(users: List[Dict]) -> int:
 
 
 def _handle_braze_response(response: requests.Response) -> int:
-    """Handles server response from Braze API. 
+    """Handles server response from Braze API.
 
-    The amount of requests made is well 
+    The amount of requests made is well
     below the limits for the given API endpoint therefore Too Many Requests
     API errors are not expected. In case they do, however, occur - the API
     calls will be re-tried, up to `MAX_API_RETRIES`, using exponential delay.
@@ -308,10 +355,10 @@ def _handle_braze_response(response: requests.Response) -> int:
     retries have been reached, the execution will terminate.
 
     In case users were posted but there were minor mistakes, the errors will be
-    logged. In case the API received data in an unexpected format, the data 
+    logged. In case the API received data in an unexpected format, the data
     that caused the issue will be logged.
 
-    In any unexpected client API error (other than 400), the function execution 
+    In any unexpected client API error (other than 400), the function execution
     will terminate.
 
     :param response: Response from the API
@@ -378,6 +425,58 @@ def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -
     print(f"Processed {processed_users:,} users")
     print(f"Use the event below to continue processing the file:")
     print(json.dumps(event))
+
+
+TYPE_MAP = {
+    'string': str,
+    'integer': int,
+    'float': float,
+    'boolean': bool
+}
+
+
+def _process_type_cast(type_cast: Optional[str]) -> Dict:
+    """Builds a type casting dictionary where the key represents a column name
+    and the value is the type to cast to.
+    Valid cast types include: string, integer, float and boolean.
+    If the cast type is invalid, the cast will be ignored.
+
+    :param type_cast: Type cast string where each mapping is separate by 
+                      a comma and each cast is specified with column_name=type.
+                      Example:
+                        attribute_name=float,another_name=boolean
+    :returns: Type cast dictionary
+    """
+    cast_map = {}
+    if not type_cast:
+        return cast_map
+
+    for cast in type_cast.split(','):
+        col, t = cast.strip().split('=')
+        try:
+            assert t in TYPE_MAP
+        except AssertionError:
+            print(f"Cast type {t} for column {col} not in supported types."
+                  "Type will not be applied.")
+            continue
+        cast_map[col] = TYPE_MAP[t]
+    return cast_map
+
+
+def _is_int(value: str) -> bool:
+    try:
+        int(value)
+        return True
+    except Exception:
+        return False
+
+
+def _is_float(value: str) -> bool:
+    try:
+        float(value)
+        return True
+    except Exception:
+        return False
 
 
 class APIRetryError(RequestException):
