@@ -40,6 +40,7 @@ external_id,CustomAttribute
 user123,null
 ```
 
+<a name="type-cast"></a>
 #### Forcing a Data Type
 
 If you want to avoid automatic attribute data type setting, you can force a particular data type onto an attribute. For example, you can force `0` and `1` values to be boolean values. You can force a numerical attribute to be represented as strings. Or you can force a decimal number (float) to be a whole number (integer).
