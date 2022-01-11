@@ -21,13 +21,15 @@ CSV file example:
 
 ### CSV File Processing
 
+Value types will be automatically inferred. For example, numerical attributes will be send as either integers or floats. Boolean values such as `True`, `false`, `FALSE` will be send as a boolean `true` or `false`. If you would like to force a certain type at the import time, you can do so by setting the [TYPE_CAST variable](#type-cast).
+
 #### Empty Values
 
 Any empty values will be ignored. That will help you save on data points when updating custom attributes.
 
 #### Array Attributes
 
-Any values in an array will be automatically destructured and sent to the API in an array rather than a string representation of an array. For example, value `"['Value1', 'Value2']"` will be sent to Braze as array attribute `['Value1', 'Value2']`.
+Any values in an array will be automatically destructured and sent to the API in an array. For example, value `"['Value1', 'Value2']"` will be sent to Braze as array attribute `['Value1', 'Value2']`.
 
 #### Unsetting Attributes
 
@@ -37,6 +39,30 @@ To unset, or remove, an attribute, you can use a special string value `null`. Fo
 external_id,CustomAttribute
 user123,null
 ```
+
+#### Forcing a Data Type
+
+If you want to avoid automatic attribute data type setting, you can force a particular data type onto an attribute. For example, you can force `0` and `1` values to be boolean values. You can force a numerical attribute to be represented as strings. Or you can force a decimal number (float) to be a whole number (integer).
+
+Supported data types include:
+
+- string
+- integer
+- float
+- boolean
+
+Cast variable format:
+
+    column_name=data_type,another_column_name=data_type
+
+For example:
+
+    zip_code=string,one_or_zero=boolean
+
+In order to set the type cast, in the Lambda function, navigate to the **Configuration** tab and select _Environment variables_. Add a new variable by clicking _Edit_:
+
+- Key: `TYPE_CAST`
+- Value: Data cast string in the format specified above
 
 ## Requirements
 
@@ -55,7 +81,6 @@ You can find your API URL, or the REST endpoint, in Braze documentation -- https
 For example, if your dashboard shows `dashboard-01.braze.com/` URL, your REST endpoint would be `https://rest.iad-01.braze.com`.
 
 You can also find your REST API URL in the dashboard. In then the left navigation panel, scroll down and select **Manage App Group**.
-
 
 There, you can find your `SDK Endpoint`. Replace `sdk` with `rest` to get your REST Endpoint. For example, if you see `sdk.iad-01.braze.com`, your API URL would be `https://rest.iad-01.braze.com`
 
