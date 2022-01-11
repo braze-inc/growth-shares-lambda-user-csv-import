@@ -27,7 +27,8 @@ import requests
 import boto3
 from urllib.parse import unquote_plus
 from requests.exceptions import RequestException
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type  # type: ignore
+
 
 # 10 minute function timeout
 FUNCTION_RUN_TIME = 10 * 60 * 1_000
@@ -202,7 +203,7 @@ class CsvProcessor:
 def _get_file_from_s3(bucket_name: str, object_key: str):
     """Returns the S3 Object with `object_key` name, from `bucket_name` S3
     bucket."""
-    return boto3.resource("s3").Object(bucket_name, object_key)
+    return boto3.resource("s3").Object(bucket_name, object_key)  # type: ignore
 
 
 def _get_object_stream(object, offset: int):
