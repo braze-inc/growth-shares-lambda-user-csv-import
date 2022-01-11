@@ -283,7 +283,7 @@ def _process_value(
 
     if stripped == 'null':
         return None
-    elif not leading_zero_int and _is_int(value):
+    elif not leading_zero_int and _is_int(stripped):
         return int(stripped)
     elif not leading_zero_int and _is_float(stripped):
         return float(stripped)
@@ -292,8 +292,7 @@ def _process_value(
     elif stripped == 'false':
         return False
     elif len(stripped) > 1 and stripped[0] == '[' and stripped[-1] == ']':
-        list_values = ast.literal_eval(stripped)
-        return list_values
+        return ast.literal_eval(stripped)
     else:
         return value
 

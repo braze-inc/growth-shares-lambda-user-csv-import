@@ -69,15 +69,15 @@ def test__process_row_single_digit_value():
     assert len(processed_row) > 1
 
 
-def test__process_value_int():
+def test__process_value_numerical():
     assert 90 == app._process_value("90")
     assert 0 == app._process_value("0")
     assert -5 == app._process_value("-5")
 
-
-def test__process_value_float():
     assert 0.98 == app._process_value("0.98")
     assert -4.23 == app._process_value("-4.23")
+    assert "972-000-0000" == app._process_value("972-000-0000")
+    assert "11/11/2011" == app._process_value("11/11/2011")
 
 
 def test__process_value_leading_zero_int():

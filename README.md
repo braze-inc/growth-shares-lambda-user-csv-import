@@ -42,7 +42,7 @@ user123,null
 
 #### Forcing a Data Type
 
-If you want to avoid automatic attribute data type setting, you can force a particular data type onto an attribute. The casting must make sense - for example, you can't cast a float string '4.12' to an integer.
+If you want to avoid automatic attribute data type setting, you can force a particular data type onto an attribute. For example, you can force `0` and `1` values to be boolean values. You can force a numerical attribute to be represented as strings. Or you can force a decimal number (float) to be a whole number (integer).
 
 Supported data types include:
 
