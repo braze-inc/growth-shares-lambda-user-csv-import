@@ -74,6 +74,8 @@ Resources:
                   - Name: suffix
                     Value: .csv
       Policies:
+        - LambdaInvokePolicy:
+            FunctionName: braze-user-csv-import
         - S3ReadPolicy:
             BucketName: !Join
               - "-"
