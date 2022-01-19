@@ -217,7 +217,7 @@ To create a new role with these permissions open [Roles](https://console.aws.ama
 
    1. Select _Author from scratch_
    2. Name your function
-   3. Select **Python 3.6** runtime
+   3. Select **Python 3.7** runtime
    4. Under **Change default execution role**, select _Use an existing role_ and select a role with all three policies described [above](#role)
    5. Create the function
 
