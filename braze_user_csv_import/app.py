@@ -174,16 +174,17 @@ class CsvProcessor:
         leftover = b''
         for chunk in object_stream.iter_chunks(chunk_size=chunk_size):
             data = leftover + chunk
+
+            # Current chunk is not the end of the file
             if len(data) + self.total_offset < self.csv_file.content_length:
                 last_newline = data.rfind(b'\n')
                 data, leftover = data[:last_newline], data[last_newline:]
-            else:
-                leftover == b''
 
             for line in data.splitlines(keepends=True):
                 self.processing_offset += len(line)
                 yield line.decode("utf-8")
 
+        # Last empty new line in the file
         if leftover == b'\n':
             self.total_offset += len(leftover)
 
@@ -199,7 +200,7 @@ class CsvProcessor:
 
     def is_finished(self) -> bool:
         """Returns whether the end of file was reached or there were no rows in the file."""
-        return not self.total_offset or self.total_offset >= self.csv_file.content_length
+        return not self.processed_users or not self.total_offset or self.total_offset >= self.csv_file.content_length
 
     def _move_offset(self) -> None:
         self.total_offset += self.processing_offset

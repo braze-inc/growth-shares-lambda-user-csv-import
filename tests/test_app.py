@@ -90,17 +90,15 @@ def test__process_value_boolean():
     assert False == app._process_value("false")
 
 
-def test__process_value_array_of_numbers():
+def test__process_value_array():
     assert [9.12, 1, 4] == app._process_value("[9.12, 1, 4]")
-
-
-def test__process_value_array_of_strings():
     assert ["a", "b", "c"] == app._process_value("['a', 'b', 'c']")
 
 
 def test__process_value_force_cast_to_int():
     assert 4 == app._process_value("4.23", int)
     assert 0 == app._process_value("00", int)
+    assert -230 == app._process_value("-230", int)
 
 
 def test__process_value_force_cast_to_str():
