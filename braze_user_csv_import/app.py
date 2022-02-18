@@ -73,12 +73,13 @@ def lambda_handler(event, context):
     try:
         csv_processor.process_file(context)
     except Exception as e:
-        event = _create_event(
+        fatal_event = _create_event(
             event,
             csv_processor.total_offset,
             csv_processor.headers
         )
-        _handle_fatal_error(str(e), csv_processor.processed_users, event)
+        _handle_fatal_error(
+            str(e), csv_processor.processed_users, fatal_event, object_key)
         raise
 
     print(f"Processed {csv_processor.processed_users:,} users.")
@@ -90,6 +91,7 @@ def lambda_handler(event, context):
             csv_processor.headers
         )
 
+    _publish_message(object_key, "success", csv_processor.processed_users)
     return {
         "users_processed": csv_processor.processed_users,
         "bytes_read": csv_processor.total_offset - event.get("offset", 0),
@@ -418,12 +420,39 @@ def _should_terminate(context) -> bool:
     return context.get_remaining_time_in_millis() < FUNCTION_TIME_OUT
 
 
-def _handle_fatal_error(error_message: str, processed_users: int, event: Dict) -> None:
+def _publish_message(file_name: str, result: str, users_processed: int) -> None:
+    """Publishes a message to AWS SNS.
+
+    :param file_name: Name of the CSV file processed
+    :param result: Result of the processing, success or fail
+    :param users_processed: Number of users sent to Braze successfully
+    """
+    topic_arn = os.environ.get('TOPIC_ARN')
+    if not topic_arn:
+        return
+
+    sns_client = boto3.client('sns')
+    message = json.dumps({
+        "fileName": file_name,
+        "result": result,
+        "usersProcessed": users_processed
+    })
+    sns_client.publish(TargetArn=topic_arn, Message=message)
+
+
+def _handle_fatal_error(
+    error_message: str,
+    processed_users: int,
+    event: Dict,
+    file_name: str
+) -> None:
     """Prints logging information when a fatal error occurred."""
     print(f'Encountered error "{error_message}"')
     print(f"Processed {processed_users:,} users")
     print(f"Use the event below to continue processing the file:")
     print(json.dumps(event))
+
+    _publish_message(file_name, "fail", processed_users)
 
 
 TYPE_MAP = {

@@ -1,3 +1,5 @@
+
+from unittest import mock
 import pytest
 
 from braze_user_csv_import import app
@@ -59,4 +61,31 @@ def csv_processor():
         object_key="test",
         offset=0,
         headers=None
+    )
+
+
+@pytest.fixture
+def lambda_event():
+    return {
+        "Records": [
+            {
+                "s3": {
+                    "bucket": {
+                        "name": "test"
+                    },
+                    "object": {
+                        "key": "test"
+                    }
+                }
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def mock_csv_processor():
+    return mock.MagicMock(
+        headers=['test'],
+        total_offset=123,
+        processed_users=999
     )

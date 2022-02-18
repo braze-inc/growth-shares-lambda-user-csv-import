@@ -1,30 +1,69 @@
 import json
+import os
 import pytest
 from requests.exceptions import RequestException
 
 from braze_user_csv_import import app
 
 
-def test_lambda_handler_fails_assert_event_logged(mocker, capsys):
+def test_lambda_handler_fails_assert_event_logged(mocker, lambda_event, capsys):
     headers = ["header1", "header2"]
     offset = 7256
-    event = {"Records": [
-        {"s3": {"bucket": {"name": "test"}, "object": {"key": "test"}}}]}
-
     mock_processor = mocker.MagicMock(headers=headers, total_offset=offset,
                                       processed_users=999)
     # Set off fatal exception during file processing
     mock_processor.process_file.side_effect = app.FatalAPIError("Test error")
-    mock_processor = mocker.patch("braze_user_csv_import.app.CsvProcessor",
-                                  return_value=mock_processor)
+    mocker.patch("braze_user_csv_import.app.CsvProcessor",
+                 return_value=mock_processor)
+
     with pytest.raises(Exception):
-        app.lambda_handler(event, None)
+        app.lambda_handler(lambda_event, None)
 
     # Confirm that event gets logged
     logs, _ = capsys.readouterr()
-    new_event = json.dumps({**event, "offset": offset, "headers": headers})
+    new_event = json.dumps({
+        **lambda_event,
+        "offset": offset,
+        "headers": headers
+    })
     assert 'Encountered error "Test error"' in logs
     assert f"{new_event}" in logs
+
+
+def test_success_message_published_after_processing(mocker, lambda_event, mock_csv_processor):
+    target_arn = "arn::target_arn"
+    mock_boto3 = mocker.patch('braze_user_csv_import.app.boto3.client')
+    mocker.patch.dict(os.environ, {"TOPIC_ARN": target_arn})
+    mocker.patch("braze_user_csv_import.app.CsvProcessor",
+                 return_value=mock_csv_processor)
+
+    app.lambda_handler(lambda_event, None)
+    mock_boto3.assert_called_with('sns')
+    assert mock_boto3.return_value.publish.called
+
+
+def test_fail_message_published_after_error(mocker, lambda_event, mock_csv_processor):
+    target_arn = "arn::target_arn"
+    mock_boto3 = mocker.patch('braze_user_csv_import.app.boto3.client')
+    mocker.patch.dict(os.environ, {"TOPIC_ARN": target_arn})
+    mock_csv_processor.process_file.side_effect = app.FatalAPIError(
+        "Test error")
+    mocker.patch("braze_user_csv_import.app.CsvProcessor",
+                 return_value=mock_csv_processor)
+
+    with pytest.raises(Exception):
+        app.lambda_handler(lambda_event, None)
+
+    mock_boto3.assert_called_with('sns')
+    assert mock_boto3.return_value.publish.called
+
+
+def test_no_message_published_without_topic(mocker, lambda_event, mock_csv_processor):
+    mock_boto3 = mocker.patch('braze_user_csv_import.app.boto3.client')
+    mocker.patch("braze_user_csv_import.app.CsvProcessor",
+                 return_value=mock_csv_processor)
+    app.lambda_handler(lambda_event, None)
+    assert not mock_boto3.called
 
 
 def test_successful_import_offset_progresses(mocker, users, csv_processor):
@@ -174,7 +213,8 @@ def test__handle_braze_response_some_processed(mocker):
 
 def test__handle_braze_response_server_error_max_retries_not_reached_raises_non_fatal_api_error(mocker):
     res = mocker.Mock(status_code=429)
-    mocker.patch("json.loads", return_value={"errors": {"too many requests"}})
+    mocker.patch("json.loads", return_value={
+                 "errors": {"too many requests"}})
 
     with pytest.raises(app.APIRetryError):
         app._handle_braze_response(res)
