@@ -12,10 +12,10 @@ User attributes to be updated are expected in the following `.csv` format:
     external_id,attr_1,...,attr_n
     userID,value_1,...,value_n
 
-where the first column must specify the external ID of the user to be updated and the following columns specify attribute names and values. The amount of attributes you specify can vary. If the CSV file to be processed does not follow this format, the function will fail.  
+The first column must specify the external ID of the user to be updated and the following columns specify attribute names and values. The amount of attributes you specify can vary. If the CSV file to be processed does not follow this format, the function will fail.  
 CSV file example:
 
-    external_id,Loyalty Points,Last Brand Purchased
+    external_id,loyalty_point,last_brand_purchased
     abc123,1982,Solomon
     def456,578,Hunter-Hayes
 
@@ -36,11 +36,12 @@ Any values in an array will be automatically destructured and sent to the API in
 To unset, or remove, an attribute, you can use a special string value `null`. For example, the following row will remove the `CustomAttribute` from `user123`:
 
 ```
-external_id,CustomAttribute
+external_id,custom_attribute
 user123,null
 ```
 
 <a name="type-cast"></a>
+
 #### Forcing a Data Type
 
 If you want to avoid automatic attribute data type setting, you can force a particular data type onto an attribute. For example, you can force `0` and `1` values to be boolean values. You can force a numerical attribute to be represented as strings. Or you can force a decimal number (float) to be a whole number (integer).
@@ -64,6 +65,42 @@ In order to set the type cast, in the Lambda function, navigate to the **Configu
 
 - Key: `TYPE_CAST`
 - Value: Data cast string in the format specified above
+
+<a name="monitoring"></a>
+
+#### Monitoring and Logging
+
+To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
+
+#### SNS
+
+Optionally, you can publish a message to AWS SNS when the file is finished processing or it encounters a fatal error.
+
+SNS message format:
+
+    {
+        // object key of the processed file
+        "fileName": "abc.csv",
+        // true if file was processed with no fatal error
+        "success": true,
+        "usersProcessed": 123
+    }
+
+In order to use this feature, you must:
+
+- [Update](#updating) the lambda function to version `0.2.2` or higher
+- Allow Lambda to publish messages to the topic
+- Set the `TOPIC_ARN` environment variable
+
+To allow lambda to publish to the topic, head over to `Configuration -> Permissions` and under **Execution Role**, click on the Role name. Next, click `Add permissions -> Create inline policy`.
+
+- Service: SNS
+- Actions: Publish
+- Resources: Under topic, Add ARN and specify the topic ARN
+
+Review policy, add name `BrazeUserImportSNSPublish` and Create Policy.
+
+Finally, set the lambda environment variable with key: **`TOPIC_ARN`** and provide the SNS topic ARN where you would like to publish the message as the value.
 
 ## Requirements
 
@@ -127,12 +164,6 @@ The following resources were created:
 
 To run the function, drop a user attribute CSV file in the newly created S3 bucket.
 
-<a name="monitoring"></a>
-
-#### Monitoring and Logging
-
-To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
-
 #### Lambda Configuration
 
 By default, the function is created with 2048MB memory size. Lambda's CPU is proportional to the memory size. Even though, the script uses constant, low amount of memory, the stronger CPU power allows to process the file faster and send more requests simultaneously.  
@@ -142,6 +173,8 @@ You can review Lambda pricing here: https://aws.amazon.com/lambda/pricing/.
 You can reduce or increase the amount of available memory for the function in the Lambda **Configuration** tab. Under _General configuration_, click **Edit**, specify the amount of desired memory and save.
 
 Keep in mind that any more memory above 2GB has diminishing returns where it might improve processing speed by 10-20% but at the same time doubling or tripling the cost.
+
+<a name="updating"></a>
 
 #### Updating an Existing Function
 
@@ -200,7 +233,7 @@ The Lambda function requires permissions to read objects from S3, log to CloudWa
 Required policies:
 
     AmazonS3ReadOnlyAccess
-    AWSLambdaBasicExecutionROle
+    AWSLambdaBasicExecutionRole
     AWSLambdaRole
 
 To create a new role with these permissions open [Roles](https://console.aws.amazon.com/iam/home?region=us-east-1#/roles) console.
