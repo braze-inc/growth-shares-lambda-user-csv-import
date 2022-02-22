@@ -61,6 +61,8 @@ Resources:
         Variables:
           BRAZE_API_KEY: !Ref BrazeAPIKey
           BRAZE_API_URL: !Ref BrazeAPIURL
+          TYPE_CAST: ""
+          TOPIC_ARN: ""
 
       Events:
         S3Event:
