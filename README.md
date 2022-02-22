@@ -66,42 +66,6 @@ In order to set the type cast, in the Lambda function, navigate to the **Configu
 - Key: `TYPE_CAST`
 - Value: Data cast string in the format specified above
 
-<a name="monitoring"></a>
-
-#### Monitoring and Logging
-
-To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
-
-#### SNS
-
-Optionally, you can publish a message to AWS SNS when the file is finished processing or it encounters a fatal error.
-
-SNS message format:
-
-    {
-        // object key of the processed file
-        "fileName": "abc.csv",
-        // true if file was processed with no fatal error
-        "success": true,
-        "usersProcessed": 123
-    }
-
-In order to use this feature, you must:
-
-- [Update](#updating) the lambda function to version `0.2.2` or higher
-- Allow Lambda to publish messages to the topic
-- Set the `TOPIC_ARN` environment variable
-
-To allow lambda to publish to the topic, head over to `Configuration -> Permissions` and under **Execution Role**, click on the Role name. Next, click `Add permissions -> Create inline policy`.
-
-- Service: SNS
-- Actions: Publish
-- Resources: Under topic, Add ARN and specify the topic ARN
-
-Review policy, add name `BrazeUserImportSNSPublish` and Create Policy.
-
-Finally, set the lambda environment variable with key: **`TOPIC_ARN`** and provide the SNS topic ARN where you would like to publish the message as the value.
-
 ## Requirements
 
 To successfully run this Lambda function, you will need:
@@ -139,7 +103,7 @@ We will need this key shortly.
 2. Drop a CSV file with user attributes in the newly created S3 bucket
 3. The users will be automatically imported to Braze
 
-#### Deploy
+### Deploy
 
 To start processing your User Attribute CSV files, we need to deploy the Serverless Application that will handle the processing for you. This application will create the following resources automatically in order to successfully deploy:
 
@@ -160,9 +124,47 @@ The following resources were created:
 - [Lambda Function](https://console.aws.amazon.com/lambda/) - a lambda function named `braze-user-attribute-import`
 - [IAM Role](https://console.aws.amazon.com/iam/) - policy named `braze-user-csv-import-BrazeUserCSVImportRole` to allow lambda to read from S3 and to log function output
 
-#### Run
+### Run
 
 To run the function, drop a user attribute CSV file in the newly created S3 bucket.
+
+<a name="monitoring"></a>
+
+### Monitoring and Logging
+
+#### CloudWatch
+
+To make sure the function ran successfully, you can read the function's execution logs. Open the Braze User CSV Import function (by selecting it from the list of Lambdas in the console) and navigate to **Monitor**. Here, you can see the execution history of the function. To read the output, click on **View logs in CloudWatch**. Select lambda execution event you want to check.
+
+#### SNS
+
+Optionally, you can publish a message to AWS SNS when the file is finished processing or it encounters a fatal error.
+
+SNS message format:
+
+    {
+        // object key of the processed file
+        "fileName": "abc.csv",
+        // true if file was processed with no fatal error
+        "success": true,
+        "usersProcessed": 123
+    }
+
+In order to use this feature, you must:
+
+- [Update](#updating) the lambda function to version `0.2.2` or higher
+- Allow Lambda to publish messages to the topic
+- Set the `TOPIC_ARN` environment variable
+
+To allow lambda to publish to the topic, head over to `Configuration -> Permissions` and under **Execution Role**, click on the Role name. Next, click `Add permissions -> Create inline policy`.
+
+- Service: SNS
+- Actions: Publish
+- Resources: Under topic, Add ARN and specify the topic ARN
+
+Review policy, add name `BrazeUserImportSNSPublish` and Create Policy.
+
+Finally, set the lambda environment variable with key: **`TOPIC_ARN`** and provide the SNS topic ARN where you would like to publish the message as the value.
 
 #### Lambda Configuration
 
