@@ -26,7 +26,7 @@ def test_lambda_handler_fails_assert_event_logged(mocker, lambda_event, capsys):
         "offset": offset,
         "headers": headers
     })
-    assert 'Encountered error "Test error"' in logs
+    assert 'Encountered error: "Test error"' in logs
     assert f"{new_event}" in logs
 
 

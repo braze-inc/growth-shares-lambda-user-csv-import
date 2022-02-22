@@ -27,7 +27,14 @@ import requests
 import boto3
 from urllib.parse import unquote_plus
 from requests.exceptions import RequestException
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type  # type: ignore
+
+from tenacity import (
+    RetryCallState,
+    retry,
+    stop_after_attempt,  # type: ignore
+    wait_exponential,  # type: ignore
+    retry_if_exception_type  # type: ignore
+)
 
 
 # 10 minute function timeout
@@ -78,11 +85,11 @@ def lambda_handler(event, context):
             csv_processor.total_offset,
             csv_processor.headers
         )
-        _handle_fatal_error(
-            str(e), csv_processor.processed_users, fatal_event, object_key)
+        _handle_fatal_error(e, csv_processor.processed_users,
+                            fatal_event, object_key)
         raise
 
-    print(f"Processed {csv_processor.processed_users:,} users.")
+    print(f"Processed {csv_processor.processed_users:,} users")
     if not csv_processor.is_finished():
         _start_next_process(
             context.function_name,
@@ -90,8 +97,10 @@ def lambda_handler(event, context):
             csv_processor.total_offset,
             csv_processor.headers
         )
+    else:
+        print(f"File {object_key} import is complete")
 
-    _publish_message(object_key, "success", csv_processor.processed_users)
+    _publish_message(object_key, True, csv_processor.processed_users)
     return {
         "users_processed": csv_processor.processed_users,
         "bytes_read": csv_processor.total_offset - event.get("offset", 0),
@@ -239,12 +248,12 @@ def _verify_headers(columns: Optional[Sequence[str]], type_cast: TypeMap) -> Non
     if columns[0] != 'external_id':
         raise ValueError(
             "File headers don't match the expected format."
-            "First column should specify a user's 'external_id'.")
+            "First column should specify a user's 'external_id'")
 
     for column_name in type_cast:
         if column_name not in columns:
             print(f"Warning: Cast column {column_name} not found."
-                  "Cast will not be applied.")
+                  "Cast will not be applied")
 
 
 def _process_row(user_row: Dict, type_cast: TypeMap) -> Dict:
@@ -318,9 +327,16 @@ def _post_users(user_chunks: List[List]) -> int:
     return updated
 
 
+def _on_network_retry_error(state: RetryCallState):
+    print(
+        f"Retry attempt: {state.attempt_number}/{MAX_RETRIES}. Wait time: {state.idle_for}")
+
+
 @retry(retry=retry_if_exception_type(RequestException),
-       wait=wait_exponential(multiplier=8, min=8, max=120),
-       stop=stop_after_attempt(MAX_RETRIES))
+       wait=wait_exponential(multiplier=5, min=5),
+       stop=stop_after_attempt(MAX_RETRIES),
+       after=_on_network_retry_error,
+       reraise=True)
 def _post_to_braze(users: List[Dict]) -> int:
     """Posts users read from the CSV file to Braze users/track API endpoint.
 
@@ -420,39 +436,45 @@ def _should_terminate(context) -> bool:
     return context.get_remaining_time_in_millis() < FUNCTION_TIME_OUT
 
 
-def _publish_message(file_name: str, result: str, users_processed: int) -> None:
+def _publish_message(file_name: str, success: bool, users_processed: int) -> None:
     """Publishes a message to AWS SNS.
 
     :param file_name: Name of the CSV file processed
-    :param result: Result of the processing, success or fail
+    :param result: Result of the processing, 'success' or 'fail'
     :param users_processed: Number of users sent to Braze successfully
     """
     topic_arn = os.environ.get('TOPIC_ARN')
     if not topic_arn:
+        print("No topic ARN provided. Skipping publishing a message")
         return
 
+    print("Publishing a message to SNS")
     sns_client = boto3.client('sns')
     message = json.dumps({
         "fileName": file_name,
-        "result": result,
+        "success": success,
         "usersProcessed": users_processed
     })
-    sns_client.publish(TargetArn=topic_arn, Message=message)
+
+    sns_client.publish(
+        TargetArn=topic_arn,
+        Message=message
+    )
 
 
 def _handle_fatal_error(
-    error_message: str,
+    error: Exception,
     processed_users: int,
     event: Dict,
     file_name: str
 ) -> None:
     """Prints logging information when a fatal error occurred."""
-    print(f'Encountered error "{error_message}"')
+    print(f'Encountered error: "{error}"')
     print(f"Processed {processed_users:,} users")
     print(f"Use the event below to continue processing the file:")
     print(json.dumps(event))
 
-    _publish_message(file_name, "fail", processed_users)
+    _publish_message(file_name, False, processed_users)
 
 
 TYPE_MAP = {
@@ -485,7 +507,7 @@ def _process_type_cast(type_cast: Optional[str]) -> Dict:
             assert t in TYPE_MAP
         except AssertionError:
             print(f"Cast type {t} for column {col} not in supported types."
-                  "Type will not be applied.")
+                  "Type will not be applied")
             continue
         cast_map[col] = TYPE_MAP[t]
     return cast_map
