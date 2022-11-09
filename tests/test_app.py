@@ -132,6 +132,13 @@ def test__process_value_boolean():
 def test__process_value_array():
     assert [9.12, 1, 4] == app._process_value("[9.12, 1, 4]")
     assert ["a", "b", "c"] == app._process_value("['a', 'b', 'c']")
+    assert app._process_value("[ab-cd]") == "[ab-cd]"
+
+
+def test__process_value_starts_with_symbol():
+    assert "[ex" == app._process_value("[ex")
+    assert "<lol" == app._process_value("<lol")
+    assert "str[he%l@@]" == app._process_value("str[he%l@@]")
 
 
 def test__process_value_force_cast_to_int():
