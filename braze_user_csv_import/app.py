@@ -156,8 +156,8 @@ class CsvProcessor:
             try:
                 processed_row = _process_row(row, self.type_cast)
             except Exception as e:
-                print("ERROR: Could not process row:", str(e))
-                print("ERROR: Failing row:", dict(row))
+                print(
+                    f"ERROR: Could not process row - {str(e)}. Failing row: {dict(row)}")
                 continue
 
             if len(processed_row) <= 1:
@@ -252,12 +252,12 @@ def _verify_headers(columns: Optional[Sequence[str]], type_cast: TypeMap) -> Non
 
     if columns[0] != 'external_id':
         raise ValueError(
-            "File headers don't match the expected format."
+            "ERROR: File headers don't match the expected format."
             "First column should specify a user's 'external_id'")
 
     for column_name in type_cast:
         if column_name not in columns:
-            print(f"Warning: Cast column {column_name} not found."
+            print(f"WARNING: Cast column {column_name} not found."
                   "Cast will not be applied")
 
 
@@ -269,7 +269,7 @@ def _process_row(user_row: Dict, type_cast: TypeMap) -> Dict:
     processed_row = {}
     for col, value in user_row.items():
         if value is None:
-            print(f"None value received for column {col} in row {user_row}")
+            print(f"WARNING: None value received for column {col} in row {user_row}")
             continue
         if value.strip() == '':
             continue
@@ -341,7 +341,7 @@ def _post_users(user_chunks: List[List]) -> int:
 
 def _on_network_retry_error(state: RetryCallState):
     print(
-        f"Retry attempt: {state.attempt_number}/{MAX_RETRIES}. Wait time: {state.idle_for}")
+        f"INFO: Retry attempt: {state.attempt_number}/{MAX_RETRIES}. Wait time: {state.idle_for}")
 
 
 @retry(retry=retry_if_exception_type(RequestException),
