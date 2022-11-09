@@ -123,8 +123,8 @@ class CsvProcessor:
         bucket_name: str,
         object_key: str,
         offset: int = 0,
-        headers: List[str] = None,
-        type_cast: TypeMap = None
+        headers: Optional[List[str]] = None,
+        type_cast: Optional[TypeMap] = None
     ) -> None:
         self.processing_offset = 0
         self.total_offset = offset
@@ -149,10 +149,17 @@ class CsvProcessor:
         """
         reader = csv.DictReader(self.iter_lines(), fieldnames=self.headers)
         _verify_headers(reader.fieldnames, self.type_cast)
+        self.headers = reader.fieldnames or self.headers
 
         user_rows, user_row_chunks = [], []
         for row in reader:
-            processed_row = _process_row(row, self.type_cast)
+            try:
+                processed_row = _process_row(row, self.type_cast)
+            except Exception as e:
+                print("ERROR: Could not process row:", str(e))
+                print("ERROR: Failing row:", dict(row))
+                continue
+
             if len(processed_row) <= 1:
                 continue
 
@@ -171,8 +178,6 @@ class CsvProcessor:
             if user_rows:
                 user_row_chunks.append(user_rows)
             self.post_users(user_row_chunks)
-
-        self.headers = reader.fieldnames or self.headers
 
     def iter_lines(self) -> Iterator:
         """Iterates over lines in the object.
@@ -263,6 +268,9 @@ def _process_row(user_row: Dict, type_cast: TypeMap) -> Dict:
     """
     processed_row = {}
     for col, value in user_row.items():
+        if value is None:
+            print(f"None value received for column {col} in row {user_row}")
+            continue
         if value.strip() == '':
             continue
         processed_row[col] = _process_value(value, type_cast.get(col))
@@ -304,7 +312,11 @@ def _process_value(
     elif stripped == 'false':
         return False
     elif len(stripped) > 1 and stripped[0] == '[' and stripped[-1] == ']':
-        return ast.literal_eval(stripped)
+        try:
+            return ast.literal_eval(stripped)
+        except Exception:
+            print("ERROR: Could not convert value to an array:", stripped)
+            return stripped
     else:
         return value
 
@@ -357,6 +369,7 @@ def _post_to_braze(users: List[Dict]) -> int:
     data = json.dumps({"attributes": users})
     response = requests.post(f"{BRAZE_API_URL}/users/track",
                              headers=headers, data=data)
+
     error_users = _handle_braze_response(response)
     return len(users) - error_users
 
