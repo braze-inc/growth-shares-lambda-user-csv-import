@@ -13,7 +13,7 @@ Metadata:
     ReadmeUrl: README_APP_REPO.md
     Labels: ["braze", "user-attributes"]
     HomePageUrl: https://github.com/braze-inc/growth-shares-lambda-user-csv-import
-    SemanticVersion: 0.2.2
+    SemanticVersion: 0.2.3
     SourceCodeUrl: https://github.com/braze-inc/growth-shares-lambda-user-csv-import
 
 Parameters:
