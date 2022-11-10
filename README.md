@@ -5,6 +5,13 @@
 This serverless application allows you to easily deploy a Lambda process that will post user attribute data from a CSV file directly to Braze using Braze Rest API endpoint [User Track](https://www.braze.com/docs/api/endpoints/user_data/post_user_track/). The process launches immediately when you upload a CSV file to the configured AWS S3 bucket.  
 It can handle large files and uploads. However, it is important to keep in mind that due to Lambda's time limits, the function will stop execution after 10 minutes. The process will launch another Lambda instance to finish processing the remaining of the file. For more details about function timing, checkout [Execution Times](#execution-times).
 
+## Features
+
+- Ingest user attribute CSV file to Braze
+- Unset attributes with special `null` value
+- Skip attribute update by omitting a value for the given user
+- Force a particular data type for a given attribute (most useful for phone numbers and zip codes)
+
 ### CSV User Attributes
 
 User attributes to be updated are expected in the following `.csv` format:
