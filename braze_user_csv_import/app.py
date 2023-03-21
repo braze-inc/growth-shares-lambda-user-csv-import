@@ -295,17 +295,20 @@ def _process_value(
     if cast == str:
         return value
 
-    stripped = value.strip().lower()
-    leading_zero_int = len(stripped) > 1 and stripped.startswith('0') \
-        and not stripped.startswith('0.')
     if cast:
         return cast(_process_value(value))
 
+    stripped = value.strip().lower()
+    leading_zero_int = len(stripped) > 1 and stripped.startswith('0') \
+        and not stripped.startswith('0.')
+
+    is_numeric = stripped.replace('.', '').replace('-', '').isdigit()
+
     if stripped == 'null':
         return None
-    elif not leading_zero_int and _is_int(stripped):
+    elif is_numeric and not leading_zero_int and _is_int(stripped):
         return int(stripped)
-    elif not leading_zero_int and _is_float(stripped):
+    elif is_numeric and not leading_zero_int and _is_float(stripped):
         return float(stripped)
     elif stripped == 'true':
         return True
