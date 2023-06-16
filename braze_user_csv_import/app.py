@@ -314,6 +314,8 @@ def _process_value(
         return True
     elif stripped == 'false':
         return False
+    #reset stripped so case is preserved
+    stripped = value.strip()
     elif len(stripped) > 1 and stripped[0] == '[' and stripped[-1] == ']':
         try:
             return ast.literal_eval(stripped)
