@@ -298,21 +298,21 @@ def _process_value(
     if cast:
         return cast(_process_value(value))
 
-    stripped = value.strip().lower()
+    stripped = value.strip()
     leading_zero_int = len(stripped) > 1 and stripped.startswith('0') \
         and not stripped.startswith('0.')
 
     is_numeric = stripped.replace('.', '').replace('-', '').isdigit()
 
-    if stripped == 'null':
+    if stripped.lower() == 'null':
         return None
     elif is_numeric and not leading_zero_int and _is_int(stripped):
         return int(stripped)
     elif is_numeric and not leading_zero_int and _is_float(stripped):
         return float(stripped)
-    elif stripped == 'true':
+    elif stripped.lower() == 'true':
         return True
-    elif stripped == 'false':
+    elif stripped.lower() == 'false':
         return False
     elif len(stripped) > 1 and stripped[0] == '[' and stripped[-1] == ']':
         try:
