@@ -247,12 +247,22 @@ pytest
   `app.lambda_handler`. Timeout 15 minutes, 2048 MB, retry attempts 0.
 - `braze_user_csv_import/requirements.txt` pins the Python 3.14 tree
   (`boto3`, `requests`, `tenacity`, and their dependencies).
-- `package.sh` installs that file and zips every module next to the
-  dependencies. Build the zip on Linux, or for the Lambda architecture, so
-  binary wheels match Amazon Linux. `charset-normalizer` is the package most
-  likely to break if the zip is built on macOS and deployed as-is.
-- Lambda's Python 3.14 runtime already includes boto3. The packaged copy
-  replaces it so the pin in `requirements.txt` is what runs.
+- `package.sh` installs that file, except `boto3`, `botocore`, `s3transfer`,
+  and the libraries only those packages need, then zips every module next to
+  the remaining dependencies. Build the zip on Linux, or for the Lambda
+  architecture, so binary wheels match Amazon Linux. `charset-normalizer` is
+  the package most likely to break if the zip is built on macOS and deployed
+  as-is.
+- Lambda's Python 3.14 runtime already includes boto3 and botocore. Do not
+  package them.
+
+## GitHub release
+
+Update `SemanticVersion` in `template.yaml` before packaging. `package.sh`
+reads that field and writes
+`build/braze-lambda-user-csv-import-v<SemanticVersion>.zip`. Operator steps,
+including the Lambda-image build and publishing from the GitHub Releases
+page, are in the README under **GitHub release**.
 
 ## Change safely
 

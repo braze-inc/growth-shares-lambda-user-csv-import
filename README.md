@@ -464,4 +464,21 @@ To check only the event parsing, without AWS:
 
 `tests/test_app.py` calls `lambda_handler` with a fake S3 event and checks success, fatal errors, SNS, and the follow-up invoke. To invoke the deployed function with a real file, use a test event from [Manual Triggers](#manual-triggers). The handler name stays `app.lambda_handler`.
 
+### GitHub release
+
+Publish a release from the repository root. The asset name matches previous releases, for example `braze-lambda-user-csv-import-v0.3.0.zip`.
+
+1. Set `SemanticVersion` in `template.yaml` to the release version and commit that change. `package.sh` reads this value for the zip name. For `0.3.0`, the file is `build/braze-lambda-user-csv-import-v0.3.0.zip`.
+2. Build the zip in the Lambda Python image. That image does not include the `zip` command, so install it first. A zip built on macOS can include a macOS `charset-normalizer` wheel that fails in Lambda. The zip includes `requests` and `tenacity`. It does not include `boto3` or `botocore`, because the Lambda Python runtime already provides them.
+
+    docker run --rm -v "$PWD":/var/task -w /var/task --entrypoint bash \
+      public.ecr.aws/lambda/python:3.14 \
+      -lc 'dnf install -y zip && ./package.sh'
+
+3. Open [Releases](https://github.com/braze-inc/growth-shares-lambda-user-csv-import/releases) and choose **Draft a new release**.
+4. Choose a tag of `v` plus the version in `template.yaml`, for example `v0.3.0`. Create the tag on the commit that contains that `SemanticVersion`.
+5. Set the release title to the same tag, for example `v0.3.0`, and write the release notes.
+6. Under the release notes, attach `build/braze-lambda-user-csv-import-v0.3.0.zip`. Leave the zip name unchanged so it matches earlier release assets.
+7. Choose **Publish release**.
+
 Contributions are welcome.
