@@ -259,7 +259,7 @@ To create a new role with these permissions open [Roles](https://console.aws.ama
 
    1. Select _Author from scratch_
    2. Name your function
-   3. Select **Python 3.7** runtime
+   3. Select **Python 3.14** runtime
    4. Under **Change default execution role**, select _Use an existing role_ and select a role with all three policies described [above](#role)
    5. Create the function
 
@@ -273,12 +273,121 @@ To create a new role with these permissions open [Roles](https://console.aws.ama
 
 # Contributing and Testing
 
-In order to run tests, install
+Use Python 3.14. Run the commands below from the repository root.
 
-    pip install pytest pytest-mock pytest-env
+### Virtual environment
 
-And run
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -r braze_user_csv_import/requirements.txt
+    python -m pip install pytest pytest-mock pytest-env
+
+If `python3` is not 3.14, create the environment with `python3.14 -m venv .venv` instead. `.venv` is gitignored. Activate it again in any new shell before the commands in this section.
+
+### Run the test suite
+
+`pytest.ini` sets stand-in `BRAZE_API_URL` and `BRAZE_API_KEY` values, so the suite does not call Braze or AWS.
 
     pytest
+
+To run one area:
+
+    pytest tests/test_csv_processor.py
+    pytest tests/test_braze_client.py
+    pytest tests/test_s3_handler.py
+    pytest tests/test_app.py
+
+### Test each step
+
+The import is split so each step can be run without deploying Lambda. `tests/fixtures/sample_users.csv` is a local stand-in for an uploaded file. It uses the CSV format above, including integers, floats, booleans, a leading-zero zip code, list cells, `null`, an empty cell, and a row that only has `external_id` (that row is skipped).
+
+#### Attribute values
+
+This does not read a file and does not call Braze.
+
+    python - <<'PY'
+    from braze_user_csv_import.attributes import process_row, process_type_cast, process_value
+
+    print(process_value("1982"))
+    print(process_value("12.50"))
+    print(process_value("true"))
+    print(process_value("null"))
+    print(process_value("02134"))
+    print(process_value("['red', 'blue']"))
+    print(process_row({"external_id": "abc123", "loyalty_point": "1982", "notes": ""}, {}))
+    print(process_value("1", process_type_cast("active_flag=boolean")["active_flag"]))
+    PY
+
+#### CSV processor
+
+Print the `/users/track` JSON for the sample file. Nothing is sent to Braze.
+
+    python -m braze_user_csv_import csv tests/fixtures/sample_users.csv
+    python -m braze_user_csv_import csv tests/fixtures/sample_users.csv --type-cast active_flag=boolean
+
+The same entry point is `python -m braze_user_csv_import.csv_processor`. `--batch-size` defaults to 75 and cannot be higher.
+
+From Python:
+
+    python - <<'PY'
+    from braze_user_csv_import import CsvProcessor
+
+    processor = CsvProcessor.from_file("tests/fixtures/sample_users.csv")
+    for row in processor.collect_attributes():
+        print(row["external_id"], row.get("loyalty_point"), row.get("custom_attribute"))
+    PY
+
+#### Braze `/users/track`
+
+Set the REST endpoint and an API key that has the `users.track` permission. These are the same values the Lambda uses.
+
+    export BRAZE_API_URL=https://rest.iad-01.braze.com
+    export BRAZE_API_KEY=your-rest-api-key
+
+Post the sample file through the CSV processor:
+
+    python -m braze_user_csv_import csv tests/fixtures/sample_users.csv --post
+
+Or post one payload on its own. The file must be either `{"attributes": [...]}` or a bare array of attribute objects, with at most 75 objects:
+
+    python -m braze_user_csv_import braze payload.json
+
+From Python:
+
+    python - <<'PY'
+    from braze_user_csv_import import BrazeClient
+
+    accepted = BrazeClient().track_attributes([
+        {"external_id": "abc123", "loyalty_point": 1982, "last_brand_purchased": "Solomon"}
+    ])
+    print(accepted)
+    PY
+
+`tests/test_braze_client.py` covers this call with a mocked response, so it does not need a real key.
+
+#### S3
+
+Read a CSV that is already in S3 and print the same payloads. This uses your AWS credentials and does not call Braze.
+
+    python -m braze_user_csv_import s3 your-bucket path/to/users.csv
+
+Add `--post` to send those users to Braze. `--offset` starts at a byte offset, which is how a follow-up Lambda resumes a large file.
+
+To check only the event parsing, without AWS:
+
+    python - <<'PY'
+    from braze_user_csv_import import S3Handler
+
+    event = {
+        "Records": [
+            {"s3": {"bucket": {"name": "your-bucket"}, "object": {"key": "path/to/users.csv"}}}
+        ]
+    }
+    print(S3Handler.parse_upload_event(event))
+    PY
+
+#### Lambda handler
+
+`tests/test_app.py` calls `lambda_handler` with a fake S3 event and checks success, fatal errors, SNS, and the follow-up invoke. To invoke the deployed function with a real file, use a test event from [Manual Triggers](#manual-triggers). The handler name stays `app.lambda_handler`.
 
 Contributions are welcome.

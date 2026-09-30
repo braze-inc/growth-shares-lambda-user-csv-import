@@ -1,23 +1,25 @@
 #!/bin/sh
+set -eu
+
 VERSION=`grep "SemanticVersion" template.yaml | awk '{print $2}'`
 
 echo "Creating build directory"
 
 if [ -d "./build" ]
-then 
+then
     echo "Build directory exists, skipping"
 else
     mkdir build
 fi
 
-echo "Packaging depencies"
+echo "Packaging dependencies"
 cd braze_user_csv_import
-pip install --target ./package requests tenacity
+python3 -m pip install --target ./package -r requirements.txt
 echo "Packaging the app"
 cd package
 zip -r ../braze-lambda-user-csv-import-v"$VERSION".zip .
 cd ..
-zip -g braze-lambda-user-csv-import-v"$VERSION".zip app.py
+zip -g braze-lambda-user-csv-import-v"$VERSION".zip *.py
 mv braze-lambda-user-csv-import-v"$VERSION".zip ../build
 rm -r package
 echo "Done"

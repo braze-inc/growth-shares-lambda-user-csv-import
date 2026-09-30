@@ -2,7 +2,7 @@
 from unittest import mock
 import pytest
 
-from braze_user_csv_import import app
+from braze_user_csv_import.csv_processor import CsvProcessor
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def users():
 
 @pytest.fixture
 def csv_processor():
-    return app.CsvProcessor(
+    return CsvProcessor(
         bucket_name="test",
         object_key="test",
         offset=0,

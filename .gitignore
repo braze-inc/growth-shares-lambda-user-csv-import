@@ -11,6 +11,7 @@ __pycache__/
 
 .vscode
 *.csv
+!tests/fixtures/sample_users.csv
 
 # SAM
 .aws-sam
