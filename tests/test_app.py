@@ -3,7 +3,7 @@ import os
 import pytest
 from requests.exceptions import RequestException
 
-from braze_user_csv_import.attributes import (
+from braze_user_csv_import.braze_attributes import (
     is_int,
     process_row,
     process_type_cast,

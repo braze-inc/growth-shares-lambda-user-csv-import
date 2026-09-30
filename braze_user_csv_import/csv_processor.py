@@ -22,13 +22,15 @@ import json
 from collections.abc import Iterator
 
 if __package__:
-    from .attributes import process_row, process_type_cast, verify_headers
+    from .braze_attributes import process_row, process_type_cast
     from .braze_client import post_user_chunks
+    from .braze_custom_events import payload_kind, shape_track_row, verify_track_headers
     from .constants import BRAZE_BATCH_SIZE, CHUNK_SIZE, FUNCTION_TIME_OUT, MAX_THREADS
     from .s3_handler import S3Handler, S3ObjectSource
 else:
-    from attributes import process_row, process_type_cast, verify_headers
+    from braze_attributes import process_row, process_type_cast
     from braze_client import post_user_chunks
+    from braze_custom_events import payload_kind, shape_track_row, verify_track_headers
     from constants import BRAZE_BATCH_SIZE, CHUNK_SIZE, FUNCTION_TIME_OUT, MAX_THREADS
     from s3_handler import S3Handler, S3ObjectSource
 
@@ -110,6 +112,8 @@ class CsvProcessor:
         self.processed_users = 0
         self.braze_client = braze_client
         self.chunk_size = chunk_size
+        self.source_name = _source_name(bucket_name, object_key, file_path, source)
+        self.object_type = payload_kind(self.source_name)
 
     @classmethod
     def from_file(
@@ -155,24 +159,25 @@ class CsvProcessor:
         )
 
     def collect_attributes(self) -> list[dict]:
-        """Return attribute objects for rows that update at least one field.
+        """Return track objects for rows that update at least one field.
 
-        Does not call Braze. Rows with only ``external_id`` are skipped.
+        Does not call Braze. Rows with only an identifier are skipped.
         """
         return list(self._iter_processed_rows())
 
     def build_track_payloads(self, batch_size: int = BRAZE_BATCH_SIZE) -> list[dict]:
         """Return ``/users/track`` bodies, one per batch.
 
-        Each body is ``{"attributes": [...]}`` with at most ``batch_size``
-        objects. ``batch_size`` cannot exceed 75.
+        The array name is ``attributes``, ``events``, or ``purchases``, chosen
+        from the file name. Each array has at most ``batch_size`` objects.
+        ``batch_size`` cannot exceed 75.
         """
         if batch_size < 1 or batch_size > BRAZE_BATCH_SIZE:
             raise ValueError(f"batch_size must be from 1 to {BRAZE_BATCH_SIZE}")
         rows = self.collect_attributes()
         payloads = []
         for start in range(0, len(rows), batch_size):
-            payloads.append({"attributes": rows[start:start + batch_size]})
+            payloads.append({self.object_type: rows[start:start + batch_size]})
         return payloads
 
     def process_file(self, context=None, batch_size: int = BRAZE_BATCH_SIZE) -> None:
@@ -231,10 +236,15 @@ class CsvProcessor:
 
     def post_users(self, user_chunks: list[list]) -> None:
         """POST batched users and advance the committed byte offset."""
-        if self.braze_client is not None:
+        if self.braze_client is not None and hasattr(self.braze_client, "track_object_chunks"):
+            updated = self.braze_client.track_object_chunks(
+                user_chunks,
+                object_type=self.object_type,
+            )
+        elif self.braze_client is not None:
             updated = self.braze_client.track_attribute_chunks(user_chunks)
         else:
-            updated = post_user_chunks(user_chunks)
+            updated = post_user_chunks(user_chunks, object_type=self.object_type)
         self.processed_users += updated
         self._move_offset()
 
@@ -249,25 +259,36 @@ class CsvProcessor:
     def _iter_processed_rows(self) -> Iterator[dict]:
         self.processing_offset = 0
         reader = csv.DictReader(self.iter_lines(), fieldnames=self.headers)
-        verify_headers(reader.fieldnames, self.type_cast)
+        verify_track_headers(reader.fieldnames, self.type_cast, self.object_type)
         self.headers = reader.fieldnames or self.headers
 
         for row in reader:
             try:
                 processed_row = process_row(row, self.type_cast)
+                shaped = shape_track_row(processed_row, self.object_type)
             except Exception as exc:
                 print(
                     f"ERROR: Could not process row - {str(exc)}. Failing row: {dict(row)}"
                 )
                 continue
 
-            if len(processed_row) <= 1:
+            if shaped is None:
                 continue
-            yield processed_row
+            yield shaped
 
     def _move_offset(self) -> None:
         self.total_offset += self.processing_offset
         self.processing_offset = 0
+
+
+def _source_name(bucket_name, object_key, file_path, source) -> str:
+    if file_path:
+        return file_path
+    if object_key:
+        return object_key
+    if source is not None:
+        return getattr(source, "file_path", None) or getattr(source, "object_key", None) or ""
+    return bucket_name or ""
 
 
 def _resolve_source(bucket_name, object_key, file_path, source):

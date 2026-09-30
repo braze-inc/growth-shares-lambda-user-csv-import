@@ -17,14 +17,17 @@ for changing the code.
 | `csv_processor.py` | `CsvProcessor`. Local file or S3. Parsing does not call Braze. |
 | `s3_handler.py` | `S3Handler`. Bucket/key from the S3 event, ranged object read |
 | `braze_client.py` | `BrazeClient` and `post_to_braze`. One `/users/track` request |
-| `attributes.py` | Cell typing: `process_row`, `process_value`, `process_type_cast` |
+| `braze_attributes.py` | Cell typing: `process_row`, `process_value`, `process_type_cast` |
+| `braze_events.py` | Event rows: `event_name` becomes `name`, other columns go in `properties` |
+| `braze_purchase.py` | Purchase rows: reserved fields stay on the object, other columns go in `properties` |
+| `braze_custom_events.py` | Shared event/purchase helpers and file-name routing |
 | `config.py` | `BRAZE_API_URL`, `BRAZE_API_KEY`, `TYPE_CAST`, `TOPIC_ARN` |
 | `errors.py` | `APIRetryError` (retry), `FatalAPIError` (stop the file) |
 | `constants.py` | Batch size, thread count, retry count, runtime hand-off |
 
 ```python
 from braze_user_csv_import import CsvProcessor, BrazeClient, S3Handler, lambda_handler
-from braze_user_csv_import.attributes import process_row, process_value, process_type_cast
+from braze_user_csv_import.braze_attributes import process_row, process_value, process_type_cast
 ```
 
 Inside the Lambda zip the same files sit at the root of the deployment package
@@ -90,7 +93,7 @@ BrazeClient().track_attributes(payloads[0]["attributes"])
 S3Handler.parse_upload_event(event)                  # -> (bucket, key)
 ```
 
-`attributes.py` does not need AWS or Braze:
+`braze_attributes.py` does not need AWS or Braze:
 
 ```python
 process_value("02134")          # "02134"
@@ -105,8 +108,8 @@ process_type_cast("zip_code=string,active_flag=boolean")
 2. `CsvProcessor` streams the object in 10 MB chunks from `event["offset"]`
    (default 0). A continuation event also carries `headers`, because the
    header row is not read again.
-3. Rows become attribute objects and are posted in batches of 75, with up to
-   20 requests in flight (`MAX_THREADS`).
+3. Rows become attribute, event, or purchase objects (from the file name) and
+   are posted in batches of 75, with up to 20 requests in flight (`MAX_THREADS`).
 4. The function stops once less than 5 minutes remain of the 15 minute Lambda
    timeout (about 10 minutes of work). It then invokes itself asynchronously
    with the current byte `offset` and `headers`.
@@ -134,7 +137,14 @@ external_id,attr_1,...,attr_n
 userID,value_1,...,value_n
 ```
 
-`external_id` must be the first column. Any other header fails the file.
+Each row needs one identifier. `external_id` is used when present. Otherwise
+`user_alias` or `braze_id`. Otherwise `email` or `phone`. A header with none
+of those columns fails the file. More than one of `external_id`, `user_alias`,
+and `braze_id` skips that row. `user_alias` is a dict cell with `alias_name`
+and `alias_label`. With a primary identifier, `email` and `phone` are profile
+attributes. Sample files: `tests/fixtures/sample_identifier_users.csv`,
+`tests/fixtures/sample_identifier_events.csv`,
+`tests/fixtures/sample_identifier_purchases.csv`.
 Empty cells are skipped so unchanged attributes are not sent. The cell
 `null` is sent as JSON `null` and unsets that attribute.
 
@@ -159,8 +169,13 @@ Rows that only contain `external_id` are not posted.
 Docs: https://www.braze.com/docs/api/endpoints/user_data/post_user_track
 
 Use this endpoint to set attributes and record custom events and purchases.
-This importer sends **attributes only**. It does not send `events`,
-`purchases`, or `group_id`.
+The CSV file name selects the array:
+
+- contains `_events_` or ends with `_events` (ignoring `.csv`): `events`. CSV column `event_name` is sent as `name`. Identifier columns stay on the event. Other columns go in `properties`. Required columns: an identifier, `event_name`, `time`.
+- contains `_purchases` or ends with `_purchases`: `purchases`. Top-level fields are the identifier, `event_name`, `time`, `product_id`, and, when present, `quantity`, `price`, and `currency`. Other columns go in `properties`. Required columns: an identifier, `event_name`, `time`, `product_id`.
+- any other name: `attributes`.
+
+A name that matches both events and purchases is rejected. This importer does not send `group_id`. Sample files: `tests/fixtures/sample_users.csv`, `tests/fixtures/sample_events.csv`, `tests/fixtures/sample_purchases.csv`.
 
 - **URL:** `{BRAZE_API_URL}/users/track`. Match the dashboard instance, for
   example dashboard `dashboard-01.braze.com` -> `https://rest.iad-01.braze.com`.
@@ -179,12 +194,13 @@ This importer sends **attributes only**. It does not send `events`,
   across `attributes`, `events`, and `purchases`. Keep
   `constants.BRAZE_BATCH_SIZE` at 75. Do not raise it.
 - **Identifier:** every object must include one of `external_id`,
-  `user_alias`, `braze_id`, `email`, or `phone`. This CSV path always sends
-  `external_id` as the primary identifier. A column named `email` or `phone`
-  is then a profile attribute on that external id, not a lookup key. A new
-  `external_id` plus an email that already exists can create a duplicate
-  profile; Braze's `/users/identify` endpoint is the migration path, and this
-  importer does not call it.
+  `user_alias`, `braze_id`, `email`, or `phone`. This CSV path uses
+  `external_id` when that cell is set, otherwise `user_alias` or `braze_id`,
+  otherwise `email` or `phone`. When a primary identifier is present, `email`
+  and `phone` are profile attributes, not lookup keys. A new `external_id`
+  plus an email that already exists can create a duplicate profile; Braze's
+  `/users/identify` endpoint is the migration path, and this importer does
+  not call it.
 - **Only one primary identifier** per object. `external_id`, `user_alias`,
   and `braze_id` together get that object rejected.
 - **Deltas:** Braze bills a data point per custom attribute in the request.
@@ -240,7 +256,7 @@ pytest
 
 ## Change safely
 
-- Leave the first-column `external_id` check in `verify_headers`.
+- Keep identifier resolution: `external_id`, else `user_alias` or `braze_id`, else `email` or `phone`. Only one primary identifier per object.
 - Leave the 75-object batch and the 20-thread wave unless Braze's limit changes.
 - A continuation must keep both `offset` and `headers`. Resuming without
   headers re-reads the header row as a user.

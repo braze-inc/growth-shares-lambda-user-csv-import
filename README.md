@@ -8,6 +8,8 @@ It can handle large files and uploads. However, it is important to keep in mind 
 ## Features
 
 - Ingest user attribute CSV file to Braze
+- Ingest custom events when the file name contains `_events_` or ends with `_events`
+- Ingest purchases when the file name contains `_purchases` or ends with `_purchases`
 - Unset attributes with special `null` value
 - Skip attribute update by omitting a value for the given user
 - Force a particular data type for a given attribute (most useful for phone numbers and zip codes)
@@ -19,12 +21,77 @@ User attributes to be updated are expected in the following `.csv` format:
     external_id,attr_1,...,attr_n
     userID,value_1,...,value_n
 
-The first column must specify the external ID of the user to be updated and the following columns specify attribute names and values. The amount of attributes you specify can vary. If the CSV file to be processed does not follow this format, the function will fail.  
+Each row needs one identifier. `external_id` is used when that cell has a value. Otherwise use `user_alias` or `braze_id`. Otherwise `email` or `phone` must be present. A file with none of those columns fails. More than one of `external_id`, `user_alias`, and `braze_id` on the same row is skipped, because Braze rejects that object. When a primary identifier is present, `email` and `phone` are profile attributes on that user. With no primary identifier, Braze looks the user up by `email` when both `email` and `phone` are set. See [identifier resolution](https://www.braze.com/docs/api/endpoints/user_data/post_user_track#identifier-resolution).
+
+`user_alias` is a dict cell with `alias_name` and `alias_label`:
+
+    "{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}"
+
+Examples that cover each identifier are `tests/fixtures/sample_identifier_users.csv`, `tests/fixtures/sample_identifier_events.csv`, and `tests/fixtures/sample_identifier_purchases.csv`.
+
 CSV file example:
 
     external_id,loyalty_point,last_brand_purchased
     abc123,1982,Solomon
     def456,578,Hunter-Hayes
+
+### CSV Events
+
+A file is imported as [events](https://www.braze.com/docs/api/objects_filters/event_object) when its name contains `_events_` or ends with `_events`. The `.csv` suffix does not count, so `sample_events.csv` and `batch_events_2026.csv` are both event files. See `tests/fixtures/sample_events.csv`.
+
+Required columns are an identifier (`external_id`, `user_alias`, `braze_id`, `email`, or `phone`), `event_name`, and `time`. `event_name` is sent as the Braze event field `name`. `time` must be an ISO 8601 datetime. Identifier columns stay on the event. Every other column is nested under `properties`. A row missing a required value is skipped.
+
+    external_id,event_name,time,movie,director
+    user1,watched_trailer,2013-07-16T19:20:30+01:00,,
+    user1,rented_movie,2013-07-16T19:20:45+01:00,The Sad Egg,Alex Smith
+
+That becomes:
+
+```json
+{"events": [
+  {
+    "external_id": "user1",
+    "name": "watched_trailer",
+    "time": "2013-07-16T19:20:30+01:00"
+  },
+  {
+    "external_id": "user1",
+    "name": "rented_movie",
+    "time": "2013-07-16T19:20:45+01:00",
+    "properties": {"movie": "The Sad Egg", "director": "Alex Smith"}
+  }
+]}
+```
+
+`time` and `event_name` cannot be custom event properties. They stay on the event object.
+
+### CSV Purchases
+
+A file is imported as [purchases](https://www.braze.com/docs/api/objects_filters/purchase_object) when its name contains `_purchases` or ends with `_purchases`. `sample_purchases.csv` and `batch_purchases_2026.csv` both match. See `tests/fixtures/sample_purchases.csv`.
+
+Required columns are an identifier (`external_id`, `user_alias`, `braze_id`, `email`, or `phone`), `event_name`, `time`, and `product_id`. Identifier columns stay on the purchase object, along with `quantity`, `price`, and `currency` when those columns have a value: `time`, `product_id`, `quantity`, `event_name`, `price`, `currency`. Every other column is nested under `properties`. Braze requires `price` and `currency` as well, and it rejects a `properties` object that repeats any of those reserved names.
+
+    external_id,event_name,time,product_id,currency,price,quantity,color
+    user1,purchased,2013-07-16T19:20:30+01:00,backpack,USD,40.00,1,red
+
+That becomes:
+
+```json
+{"purchases": [
+  {
+    "external_id": "user1",
+    "event_name": "purchased",
+    "time": "2013-07-16T19:20:30+01:00",
+    "product_id": "backpack",
+    "quantity": 1,
+    "price": 40.0,
+    "currency": "USD",
+    "properties": {"color": "red"}
+  }
+]}
+```
+
+A name that matches both events and purchases, such as `report_events_purchases.csv`, is rejected. Any other CSV is imported as user attributes. Each request still holds at most 75 objects.
 
 ### CSV File Processing
 
@@ -293,6 +360,8 @@ If `python3` is not 3.14, create the environment with `python3.14 -m venv .venv`
 To run one area:
 
     pytest tests/test_csv_processor.py
+    pytest tests/test_events_purchases.py
+    pytest tests/test_identifiers.py
     pytest tests/test_braze_client.py
     pytest tests/test_s3_handler.py
     pytest tests/test_app.py
@@ -306,7 +375,7 @@ The import is split so each step can be run without deploying Lambda. `tests/fix
 This does not read a file and does not call Braze.
 
     python - <<'PY'
-    from braze_user_csv_import.attributes import process_row, process_type_cast, process_value
+    from braze_user_csv_import.braze_attributes import process_row, process_type_cast, process_value
 
     print(process_value("1982"))
     print(process_value("12.50"))
@@ -324,8 +393,13 @@ Print the `/users/track` JSON for the sample file. Nothing is sent to Braze.
 
     python -m braze_user_csv_import csv tests/fixtures/sample_users.csv
     python -m braze_user_csv_import csv tests/fixtures/sample_users.csv --type-cast active_flag=boolean
+    python -m braze_user_csv_import csv tests/fixtures/sample_events.csv
+    python -m braze_user_csv_import csv tests/fixtures/sample_purchases.csv
+    python -m braze_user_csv_import csv tests/fixtures/sample_identifier_users.csv
+    python -m braze_user_csv_import csv tests/fixtures/sample_identifier_events.csv
+    python -m braze_user_csv_import csv tests/fixtures/sample_identifier_purchases.csv
 
-The same entry point is `python -m braze_user_csv_import.csv_processor`. `--batch-size` defaults to 75 and cannot be higher.
+Nothing is sent to Braze. The events command prints an `events` array, with `event_name` mapped to `name` and other columns under `properties`. The purchases command prints a `purchases` array. The identifier files print one object for each of `external_id`, `user_alias`, `braze_id`, `email`, and `phone`. Rows with no identifier, or with more than one of `external_id`, `user_alias`, and `braze_id`, are left out of the JSON and logged. The same entry point is `python -m braze_user_csv_import.csv_processor`. `--batch-size` defaults to 75 and cannot be higher.
 
 From Python:
 

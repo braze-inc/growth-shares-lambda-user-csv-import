@@ -14,29 +14,55 @@ TYPE_MAP = {
 }
 
 TypeMap = dict[str, type]
+OBJECT_TYPE = "attributes"
+
+
+IDENTIFIER_STRINGS = {"external_id", "braze_id", "email", "phone"}
 
 
 def verify_headers(columns: list[str] | None, type_cast: TypeMap) -> None:
-    """Require ``external_id`` as the first column.
+    """Require a Braze identifier column, then warn about unknown casts.
 
-    :raises ValueError: if a header row is present and does not start with
-        ``external_id``
+    The identifier is ``external_id``, or else ``user_alias`` or ``braze_id``,
+    or else ``email`` or ``phone``. The file fails when none of those columns
+    exist.
     """
     if not columns:
         return
 
-    if columns[0] != "external_id":
-        raise ValueError(
-            "ERROR: File headers don't match the expected format."
-            "First column should specify a user's 'external_id'"
-        )
+    _require_identifier_column(columns)
+    warn_missing_casts(columns, type_cast)
 
-    for column_name in type_cast:
-        if column_name not in columns:
-            print(
-                f"WARNING: Cast column {column_name} not found."
-                "Cast will not be applied"
-            )
+
+def shape_row(row: dict) -> dict | None:
+    """Return an attributes object.
+
+    A row with no identifier is skipped. A row that only has an identifier
+    and no attribute is skipped. ``email`` and ``phone`` stay on the object
+    when a primary identifier is also present; Braze then treats them as
+    profile attributes.
+    """
+    if not _row_has_identifier(row):
+        return None
+    if len(row) <= 1:
+        return None
+    return row
+
+
+def _require_identifier_column(columns: list[str]) -> None:
+    if __package__:
+        from .braze_custom_events import require_identifier_column
+    else:
+        from braze_custom_events import require_identifier_column
+    require_identifier_column(columns)
+
+
+def _row_has_identifier(row: dict) -> bool:
+    if __package__:
+        from .braze_custom_events import row_has_identifier
+    else:
+        from braze_custom_events import row_has_identifier
+    return row_has_identifier(row, "attribute")
 
 
 def process_row(user_row: dict, type_cast: TypeMap) -> dict:
@@ -52,8 +78,32 @@ def process_row(user_row: dict, type_cast: TypeMap) -> dict:
             continue
         if value.strip() == "":
             continue
-        processed_row[col] = process_value(value, type_cast.get(col))
+        if col == "user_alias":
+            processed_row[col] = process_user_alias(value)
+        elif col in IDENTIFIER_STRINGS:
+            processed_row[col] = process_value(value, str)
+        else:
+            processed_row[col] = process_value(value, type_cast.get(col))
     return processed_row
+
+
+def process_user_alias(value: str):
+    """Parse a ``user_alias`` cell into ``{alias_name, alias_label}``.
+
+    The cell is a Python dict literal, for example
+    ``{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}``.
+    A cell that is not a dict is returned unchanged so the row can be skipped.
+    """
+    stripped = value.strip()
+    if len(stripped) > 1 and stripped[0] == "{" and stripped[-1] == "}":
+        try:
+            parsed = ast.literal_eval(stripped)
+        except Exception:
+            print("ERROR: Could not convert user_alias:", stripped)
+            return value
+        if isinstance(parsed, dict):
+            return parsed
+    return value
 
 
 def process_value(
@@ -120,6 +170,18 @@ def process_type_cast(type_cast: str | None) -> TypeMap:
             continue
         cast_map[col] = TYPE_MAP[type_name]
     return cast_map
+
+
+def warn_missing_casts(columns: list[str] | None, type_cast: dict) -> None:
+    """Log a warning when a ``TYPE_CAST`` column is not in the header."""
+    if not columns:
+        return
+    for column_name in type_cast:
+        if column_name not in columns:
+            print(
+                f"WARNING: Cast column {column_name} not found."
+                "Cast will not be applied"
+            )
 
 
 def is_int(value: str) -> bool:
