@@ -1,5 +1,5 @@
-# Python 3.14 runtime dependencies. boto3 is included for local use; Lambda's
-# Python 3.14 runtime also provides boto3, and packaging this file replaces it.
+# Python 3.14 dependencies. boto3 is for local runs. package.sh omits boto3,
+# botocore, and their dependencies because the Lambda runtime provides them.
 boto3==1.43.105
 botocore==1.43.105
 certifi==2026.7.22
