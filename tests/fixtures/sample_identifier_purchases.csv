@@ -1,0 +1,8 @@
+external_id,user_alias,braze_id,email,phone,event_name,time,product_id,currency,price,quantity,color
+user1,,,solomon@example.com,,purchased,2013-07-16T19:20:30+01:00,backpack,USD,40.00,1,red
+,"{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}",,,,purchased,2013-07-16T19:20:45+01:00,pencil,USD,2.00,2,blue
+,,64f1a2b3c4d5e6f7a8b9c0d1,,,purchased,2022-12-06T19:20:45+01:00,notebook,USD,5.00,1,
+,,,hunter@example.com,,purchased,2013-07-16T19:20:30+01:00,mug,USD,8.00,1,green
+,,,,+15043277269,purchased,2013-07-16T19:20:50+01:00,hat,USD,15.00,1,
+,,,,,purchased,2013-07-16T19:20:30+01:00,skipped,USD,1.00,1,
+user1,"{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}",,,,purchased,2013-07-16T19:20:30+01:00,bag,USD,10.00,1,

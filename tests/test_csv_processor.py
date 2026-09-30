@@ -4,9 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-from braze_user_csv_import.attributes import process_type_cast
+from braze_user_csv_import.braze_attributes import process_type_cast
 from braze_user_csv_import.csv_processor import CsvProcessor, main
 
 SAMPLE = Path(__file__).resolve().parent / "fixtures" / "sample_users.csv"
@@ -98,13 +96,11 @@ def test_cli_prints_track_payload(capsys):
     assert payloads[0]["attributes"][0]["custom_attribute"] is None
 
 
-def test_header_must_start_with_external_id(tmp_path):
-    csv_path = tmp_path / "bad.csv"
-    csv_path.write_text("email,name\na@example.com,Ann\n")
-    processor = CsvProcessor.from_file(str(csv_path))
-
-    with pytest.raises(ValueError, match="external_id"):
-        processor.collect_attributes()
+def test_email_identifier_does_not_require_external_id(tmp_path):
+    csv_path = tmp_path / "by_email.csv"
+    csv_path.write_text("email,city\nann@example.com,Boston\n")
+    rows = CsvProcessor.from_file(str(csv_path)).collect_attributes()
+    assert rows == [{"email": "ann@example.com", "city": "Boston"}]
 
 
 def test_lambda_zip_layout_imports_app_flat():

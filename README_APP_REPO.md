@@ -10,7 +10,7 @@ User attributes to be updated are expected in the following `.csv` format:
     external_id,attr_1,...,attr_n
     userID,value_1,...,value_n
 
-where the first column must specify the external ID of the user to be updated and the following columns specify attribute names and values. The amount of attributes you specify can vary. If the CSV file to be processed does not follow this format, the function will fail.
+Each row needs one identifier: `external_id` when present, otherwise `user_alias` or `braze_id`, otherwise `email` or `phone`. The following columns specify attribute names and values. The amount of attributes you specify can vary. If the CSV file has no identifier column, the function will fail.
 
 
 #### REST Endpoint

@@ -1,0 +1,4 @@
+external_id,event_name,time,movie,director,genres
+user1,watched_trailer,2013-07-16T19:20:30+01:00,,,
+user1,rented_movie,2013-07-16T19:20:45+01:00,The Sad Egg,Alex Smith,"['drama', 'comedy']"
+abc123,added_favorite,2022-12-06T19:20:45+01:00,Solomon,,

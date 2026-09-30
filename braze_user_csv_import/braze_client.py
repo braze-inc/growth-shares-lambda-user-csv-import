@@ -2,7 +2,8 @@
 
 https://www.braze.com/docs/api/endpoints/user_data/post_user_track
 
-Each request body is ``{"attributes": [...]}`` with at most 75 objects.
+Each request body is one of ``attributes``, ``events``, or ``purchases``,
+with at most 75 objects.
 Authentication is ``Authorization: Bearer <BRAZE_API_KEY>``.
 
 Example::
@@ -68,12 +69,16 @@ def post_to_braze(
     users: list[dict],
     api_url: str | None = None,
     api_key: str | None = None,
+    object_type: str = "attributes",
 ) -> int:
-    """POST one attributes batch. Returns how many users were accepted.
+    """POST one ``/users/track`` batch. Returns how many objects were accepted.
 
+    ``object_type`` is ``attributes``, ``events``, or ``purchases``.
     Retries network errors, HTTP 429, and HTTP 5xx up to ``MAX_RETRIES``.
     A fatal client error is not retried.
     """
+    if object_type not in ("attributes", "events", "purchases"):
+        raise ValueError(f"Unsupported /users/track array: {object_type}")
     api_url = _normalize_url(api_url or get_braze_api_url())
     api_key = api_key if api_key is not None else get_braze_api_key()
     headers = {
@@ -81,7 +86,7 @@ def post_to_braze(
         "Authorization": f"Bearer {api_key}",
         "X-Braze-Bulk": "true",
     }
-    data = json.dumps({"attributes": users})
+    data = json.dumps({object_type: users})
     response = requests.post(
         f"{api_url}/users/track",
         headers=headers,
@@ -123,12 +128,18 @@ def post_user_chunks(
     user_chunks: list[list[dict]],
     api_url: str | None = None,
     api_key: str | None = None,
+    object_type: str = "attributes",
 ) -> int:
-    """POST batches concurrently. Each batch should hold at most 75 users."""
+    """POST batches concurrently. Each batch should hold at most 75 objects."""
     updated = 0
     with ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
         results = executor.map(
-            lambda users: post_to_braze(users, api_url=api_url, api_key=api_key),
+            lambda users: post_to_braze(
+                users,
+                api_url=api_url,
+                api_key=api_key,
+                object_type=object_type,
+            ),
             user_chunks,
         )
         for result in results:
@@ -149,25 +160,47 @@ class BrazeClient:
 
     def track_attributes(self, users: list[dict]) -> int:
         """POST one attributes list. Keep it to 75 objects."""
-        return post_to_braze(users, api_url=self.api_url, api_key=self.api_key)
+        return self.track_objects(users, object_type="attributes")
+
+    def track_objects(self, objects: list[dict], object_type: str = "attributes") -> int:
+        """POST one ``attributes``, ``events``, or ``purchases`` list."""
+        return post_to_braze(
+            objects,
+            api_url=self.api_url,
+            api_key=self.api_key,
+            object_type=object_type,
+        )
 
     def track_attribute_chunks(self, user_chunks: list[list[dict]]) -> int:
-        """POST many batches with up to ``MAX_THREADS`` requests at once."""
+        """POST attribute batches with up to ``MAX_THREADS`` requests at once."""
+        return self.track_object_chunks(user_chunks, object_type="attributes")
+
+    def track_object_chunks(
+        self,
+        user_chunks: list[list[dict]],
+        object_type: str = "attributes",
+    ) -> int:
+        """POST batches with up to ``MAX_THREADS`` requests at once."""
         return post_user_chunks(
             user_chunks,
             api_url=self.api_url,
             api_key=self.api_key,
+            object_type=object_type,
         )
 
 
-def _load_attribute_users(payload_path: str) -> list[dict]:
+def _load_track_objects(payload_path: str) -> tuple[list[dict], str]:
     body = json.loads(Path(payload_path).read_text())
-    if isinstance(body, dict) and isinstance(body.get("attributes"), list):
-        return body["attributes"]
+    if isinstance(body, dict):
+        for object_type in ("attributes", "events", "purchases"):
+            objects = body.get(object_type)
+            if isinstance(objects, list):
+                return objects, object_type
     if isinstance(body, list):
-        return body
+        return body, "attributes"
     raise SystemExit(
-        "Payload must be an attributes array or a {\"attributes\": [...]} object."
+        "Payload must be an object array or a "
+        '{"attributes"|"events"|"purchases": [...]} object.'
     )
 
 
@@ -178,17 +211,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "payload",
-        help='JSON file: {"attributes": [...]} or a bare array of attribute objects',
+        help='JSON file: {"attributes"|"events"|"purchases": [...]} or a bare array',
     )
     parser.add_argument("--api-url", help="Overrides BRAZE_API_URL")
     parser.add_argument("--api-key", help="Overrides BRAZE_API_KEY")
     args = parser.parse_args(argv)
 
-    users = _load_attribute_users(args.payload)
+    users, object_type = _load_track_objects(args.payload)
     client = BrazeClient(api_url=args.api_url, api_key=args.api_key)
     updated = 0
     for start in range(0, len(users), BRAZE_BATCH_SIZE):
-        updated += client.track_attributes(users[start:start + BRAZE_BATCH_SIZE])
+        updated += client.track_objects(
+            users[start:start + BRAZE_BATCH_SIZE],
+            object_type=object_type,
+        )
     print(json.dumps({"users_processed": updated}))
     return 0
 

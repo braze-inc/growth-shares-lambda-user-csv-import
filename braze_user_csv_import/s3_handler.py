@@ -87,11 +87,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if __package__:
-        from .attributes import process_type_cast
+        from .braze_attributes import process_type_cast
         from .constants import BRAZE_BATCH_SIZE
         from .csv_processor import CsvProcessor
     else:
-        from attributes import process_type_cast
+        from braze_attributes import process_type_cast
         from constants import BRAZE_BATCH_SIZE
         from csv_processor import CsvProcessor
 

@@ -1,0 +1,12 @@
+external_id,user_alias,braze_id,email,phone,loyalty_point
+abc123,,,solomon@example.com,,1982
+def456,,,,,578
+,"{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}",,,,12
+,,64f1a2b3c4d5e6f7a8b9c0d1,,,7
+,,,hunter@example.com,,578
+,,,,+15043277269,3
+,,,both@example.com,+15045550100,4
+ghost_user,,,,,
+,,,,,99
+abc123,"{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}",,,,1
+,"not-an-alias",,,,1

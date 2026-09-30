@@ -1,0 +1,3 @@
+external_id,event_name,time,product_id,currency,price,quantity,color,size
+user1,purchased,2013-07-16T19:20:30+01:00,backpack,USD,40.00,1,red,Large
+user1,purchased,2013-07-17T19:20:20+01:00,pencil,USD,2.00,2,blue,

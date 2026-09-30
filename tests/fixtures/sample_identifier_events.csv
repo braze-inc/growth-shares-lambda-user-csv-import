@@ -1,0 +1,8 @@
+external_id,user_alias,braze_id,email,phone,event_name,time,movie
+user1,,,solomon@example.com,,watched_trailer,2013-07-16T19:20:30+01:00,The Sad Egg
+,"{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}",,,,rented_movie,2013-07-16T19:20:45+01:00,The Sad Egg
+,,64f1a2b3c4d5e6f7a8b9c0d1,,,added_favorite,2022-12-06T19:20:45+01:00,Solomon
+,,,hunter@example.com,,watched_trailer,2013-07-16T19:20:30+01:00,
+,,,,+15043277269,rented_movie,2013-07-16T19:20:50+01:00,Other
+,,,,,watched_trailer,2013-07-16T19:20:30+01:00,Skipped
+user1,"{'alias_name': 'device123', 'alias_label': 'my_device_identifier'}",,,,watched_trailer,2013-07-16T19:20:30+01:00,

@@ -12,7 +12,7 @@ MAX_THREADS = 20
 MAX_RETRIES = 5
 
 # Current /users/track limit: 75 objects combined across attributes, events,
-# and purchases. This importer sends attributes only, so 75 users per request.
+# and purchases. One CSV uses one of those arrays, so 75 objects per request.
 BRAZE_BATCH_SIZE = 75
 
 # S3 and local files are read in 10 MB chunks.

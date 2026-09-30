@@ -9,12 +9,12 @@ import json
 import boto3
 
 if __package__:
-    from .attributes import process_type_cast
+    from .braze_attributes import process_type_cast
     from .config import get_topic_arn, get_type_cast_setting
     from .csv_processor import CsvProcessor
     from .s3_handler import S3Handler
 else:
-    from attributes import process_type_cast
+    from braze_attributes import process_type_cast
     from config import get_topic_arn, get_type_cast_setting
     from csv_processor import CsvProcessor
     from s3_handler import S3Handler

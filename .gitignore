@@ -12,6 +12,11 @@ __pycache__/
 .vscode
 *.csv
 !tests/fixtures/sample_users.csv
+!tests/fixtures/sample_events.csv
+!tests/fixtures/sample_purchases.csv
+!tests/fixtures/sample_identifier_users.csv
+!tests/fixtures/sample_identifier_events.csv
+!tests/fixtures/sample_identifier_purchases.csv
 
 # SAM
 .aws-sam

@@ -3,7 +3,8 @@
 Examples
 --------
 python -m braze_user_csv_import csv tests/fixtures/sample_users.csv
-python -m braze_user_csv_import csv tests/fixtures/sample_users.csv --type-cast active_flag=boolean
+python -m braze_user_csv_import csv tests/fixtures/sample_events.csv
+python -m braze_user_csv_import csv tests/fixtures/sample_purchases.csv
 python -m braze_user_csv_import braze payload.json
 python -m braze_user_csv_import s3 my-bucket uploads/users.csv
 """
