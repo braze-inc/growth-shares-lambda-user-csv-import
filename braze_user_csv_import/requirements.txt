@@ -1,12 +1,14 @@
-boto3==1.20.23
-botocore==1.23.23
-certifi==2021.10.8
-charset-normalizer==2.0.9
-idna==3.3
-jmespath==0.10.0
-python-dateutil==2.8.2
-requests==2.26.0
-s3transfer==0.5.0
-six==1.16.0
-tenacity==8.0.1
-urllib3==1.26.7
+# Python 3.14 runtime dependencies. boto3 is included for local use; Lambda's
+# Python 3.14 runtime also provides boto3, and packaging this file replaces it.
+boto3==1.43.105
+botocore==1.43.105
+certifi==2026.7.22
+charset-normalizer==3.5.2
+idna==3.20
+jmespath==1.1.0
+python-dateutil==2.9.0.post0
+requests==2.34.2
+s3transfer==0.19.2
+six==1.17.0
+tenacity==9.1.4
+urllib3==2.8.0

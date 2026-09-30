@@ -1,0 +1,5 @@
+external_id,loyalty_point,last_brand_purchased,lifetime_spend,is_member,zip_code,favorite_colors,phone,custom_attribute,active_flag
+abc123,1982,Solomon,12.50,true,02134,"['red', 'blue']",972-000-0000,null,1
+def456,578,Hunter-Hayes,0,false,01001,"['green']",,gold,0
+0166ecc9-asd9-0305-sjn9-efd44fe61b96,0,Acme,-4.23,TRUE,01234,"[9.12, 1, 4]",555-0100,,1
+ghost_user,,,,,,,,,
